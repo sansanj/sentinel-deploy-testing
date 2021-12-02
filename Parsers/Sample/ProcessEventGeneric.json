@@ -1,0 +1,25 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-08-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/imProcess')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "etag": "*",
+        "displayName": "ASIM Source Agnostic Process Events Parser",
+        "category": "Security",
+        "FunctionAlias": "imProcess",
+        "query": "union isfuzzy=true\n  vimProcessEmpty,\n  vimProcessEventMicrosoft365D,\n  vimProcessCreateMicrosoftSysmon,\n  vimProcessTerminateMicrosoftSysmon,\n  vimProcessCreateMicrosoftSecurityEvents,\n  vimProcessTerminateMicrosoftSecurityEvents,\n  vimProcessCreateLinuxSysmon,\n  vimProcessTerminateLinuxSysmon,\n  vimProcessTerminateMicrosoftWindowsEvents,\n  vimProcessCreateMicrosoftWindowsEvents,\n  vimProcessEventMD4IoT\n",
+        "version": 1
+      }
+    }
+  ]
+}

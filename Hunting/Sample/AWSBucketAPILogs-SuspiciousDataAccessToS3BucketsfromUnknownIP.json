@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/AWSBucketAPILogs-SuspiciousDataAccessToS3BucketsfromUnknownIP')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Suspicious Data Access to S3 Bucket from Unknown IP",
+        "category": "Hunting Queries",
+        "query": "\nlet EventNameList = dynamic([\"ListBucket\",\"ListObjects\",\"GetObject\"]);\nlet starttime = 14d;\nlet midtime = 2d;\nlet endtime = 1d;\nAwsBucketAPILogs_CL \n| where EventTime >= ago(endtime)\n| where EventName in (EventNameList)\n| project EventTime, EventSource,EventName, SourceIPAddress, UserIdentityType, UserIdentityArn, UserIdentityUserName, BucketName, Host, AuthenticationMethod, SessionMfaAuthenticated, SessionUserName, Key\n| join kind=leftanti\n(\n  AWSS3BucketAPILogParsed \n  | where EventTime between (ago(starttime)..ago(midtime))\n  | where EventName in (EventNameList)\n) on SourceIPAddress\n| summarize EventCount=count(), StartTimeUtc = min(EventTime), EndTimeUtc = max(EventTime), Files= makeset(Key), EventNames = makeset(EventName) by EventSource, SourceIPAddress, UserIdentityType, UserIdentityArn, UserIdentityUserName, BucketName, Host, AuthenticationMethod, SessionMfaAuthenticated, SessionUserName\n| project StartTimeUtc, EndTimeUtc, EventSource, Host, SourceIPAddress, UserIdentityType, BucketName, EventNames, Files, AuthenticationMethod, SessionMfaAuthenticated, SessionUserName, EventCount\n| extend timestamp = StartTimeUtc, HostCustomEntity = Host, AccountCustomEntity = SessionUserName, IPCustomEntity = SourceIPAddress\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Adversaries may access data objects from improperly secured cloud storage. This query will identify any access originating from a Source IP which was not seen historically accessing the bucket or downloading files from it.\nYou can also limi"
+          },
+          {
+            "name": "tactics",
+            "value": "Collection"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1530"
+          }
+        ]
+      }
+    }
+  ]
+}

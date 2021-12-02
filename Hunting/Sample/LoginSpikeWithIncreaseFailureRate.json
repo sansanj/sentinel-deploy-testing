@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/LoginSpikeWithIncreaseFailureRate')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Login spike with increase failure rate",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = starttime - 14d;\nlet failureThreshold = 15;\nlet percentageChangeThreshold = 50;\nSigninLogs\n//Collect number of users logging in for each hour\n| where TimeGenerated >= lookback\n| summarize dcount(UserPrincipalName) by bin(TimeGenerated, 1h)\n| extend hour = datetime_part(\"Hour\",TimeGenerated)\n| extend day = dayofweek(TimeGenerated)\n//Exclude Saturday and Sunday as they skew the data, change depending on your weekend days\n| where day != 6d and day != 7d\n| order by TimeGenerated asc\n//Summarise users trying to authenticate by each hour of the day\n| summarize make_list(dcount_UserPrincipalName), make_list(TimeGenerated), avg(dcount_UserPrincipalName), make_list(day) by hour\n//Find outlier hours where the number of users trying to authenticate spikes, expand and then keep only anomalous rows\n| extend series_decompose_anomalies(list_dcount_UserPrincipalName)\n| mv-expand list_dcount_UserPrincipalName, series_decompose_anomalies_list_dcount_UserPrincipalName_ad_flag, list_TimeGenerated, list_day\n| where series_decompose_anomalies_list_dcount_UserPrincipalName_ad_flag == 1\n//Calculate the percentage change between the spike and the average users authenticating\n| project TimeGenerated=todatetime(list_TimeGenerated), Hour=hour, WeekDay=list_day, AccountsAuthenticating=list_dcount_UserPrincipalName, AverageAccountsAuthenticatin=round(avg_dcount_UserPrincipalName, 0), PercentageChange = round  ((list_dcount_UserPrincipalName - avg_dcount_UserPrincipalName) / avg_dcount_UserPrincipalName * 100,   2)\n| order by PercentageChange desc\n//As an additional feature we collect successful and unsuccessful logins during the 1h windows with anomalies\n| join kind=inner(\nSigninLogs\n| where TimeGenerated >= lookback\n| where ResultType == \"0\"\n| summarize Success=dcount(UserPrincipalName), SuccessAccounts=make_set(UserPrincipalName) by bin(TimeGenerated, 1h)\n| join kind=inner(\n    SigninLogs\n    | where TimeGenerated >= lookback\n    //Failed sign-ins based on failed username/password combos or failed MFA\n    | where ResultType in (\"50126\", \"50074\", \"50057\", \"51004\")\n    | summarize Failed=dcount(UserPrincipalName), FailedAccounts=make_set(UserPrincipalName) by bin(TimeGenerated, 1h)\n) on TimeGenerated\n| project-away TimeGenerated1\n| extend Total = Failed + Success\n| project TimeGenerated, SuccessRate = round((toreal(Success) / toreal(Total)) *100) , round(FailureRate = (toreal(Failed) / toreal(Total)) *100), SuccessAccounts, FailedAccounts\n) on TimeGenerated\n| order by PercentageChange\n| project-away TimeGenerated1\n//Thresholds, 15% account authentication failure rate at a 50% increase in accounts attempting to authenticate by default\n//Comment out line below to see all anomalous results\n| where FailureRate >= failureThreshold and PercentageChange >= percentageChangeThreshold\n| extend timestamp = TimeGenerated\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This query over SiginLogs will summarise the total number of login attempts for each hour of the day on week days, this can be edited.\nThe query then uses Kusto anomaly detection to find login spikes for each hour across all days. The query"
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1078"
+          }
+        ]
+      }
+    }
+  ]
+}

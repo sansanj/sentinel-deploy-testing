@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/ADOBuildDeletedAfterPipelineMod')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Azure DevOps - Build Deleted After Pipeline Modification",
+        "category": "Hunting Queries",
+        "query": "AzureDevOpsAuditing\n| where OperationName =~ \"Release.ReleaseDeleted\"\n| extend PipelineId = tostring(Data.PipelineId)\n| extend PipelineName = tostring(Data.PipelineName)\n| extend timekey = bin(TimeGenerated, 1h)\n| join (AzureDevOpsAuditing\n| where OperationName =~ 'Release.ReleasePipelineModified'\n| extend PipelineId = tostring(Data.PipelineId)\n| extend PipelineName = tostring(Data.PipelineName)\n| extend timekey = bin(TimeGenerated, 1h)) on timekey, PipelineId, ActorUPN\n| where TimeGenerated1 < TimeGenerated\n| extend ReleaseName = tostring(Data.ReleaseName)\n| project-rename TimeModified = TimeGenerated1, TimeDeleted = TimeGenerated, ModifyOperation = OperationName1, ModifyUser=ActorUPN1, ModifyIP=IpAddress1, ModifyUA= UserAgent1, DeleteOperation=OperationName, DeleteUser=ActorUPN, DeleteIP=IpAddress, DeleteUA=UserAgent\n| project-reorder TimeModified, ProjectName, PipelineName, ModifyUser, ModifyIP, ModifyUA, TimeDeleted, DeleteOperation, DeleteUser, DeleteIP, DeleteUA,ReleaseName\n| extend timestamp = TimeDeleted, AccountCustomEntity = DeleteUser, IPCustomEntity = DeleteIP\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "An attacker altering pipelines may look to delete builds to reduce the footprint they leave on a system. This query looks for a build for a pipline being deleted within 1 hour of a pipeline being modified. This event may produce false posit"
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1053"
+          }
+        ]
+      }
+    }
+  ]
+}

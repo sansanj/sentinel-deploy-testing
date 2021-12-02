@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/NewClientRunningQueries')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "New client running queries",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = totimespan((endtime-starttime)*7);\nLAQueryLogs\n| where TimeGenerated between (ago(lookback)..starttime)\n| where ResponseCode == 200\n| join kind= rightanti(\nLAQueryLogs\n| where TimeGenerated between(starttime..endtime)\n)\non RequestClientApp\n| extend timestamp = TimeGenerated, AccountCustomEntity = AADEmail\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This hunting query looks for clients running queries that have not previously been seen running queries."
+          },
+          {
+            "name": "tactics",
+            "value": "Collection,Exfiltration"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1530,T1213,T1020"
+          }
+        ]
+      }
+    }
+  ]
+}

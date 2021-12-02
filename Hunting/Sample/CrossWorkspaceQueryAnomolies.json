@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/CrossWorkspaceQueryAnomolies')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Cross workspace query anomolies",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = starttime - 30d;\nlet threshold = 0;\nLAQueryLogs\n| where TimeGenerated between (lookback..starttime)\n| mv-expand(RequestContext)\n| extend RequestContextExtended = split(RequestTarget, \"/\")\n| extend Subscription = tostring(RequestContextExtended[2]), ResourceGroups = tostring(RequestContextExtended[4]), Workspace = tostring(RequestContextExtended[8])\n| summarize count(), HistWorkspaceCount=dcount(Workspace) by AADEmail\n| join (\nLAQueryLogs\n| where TimeGenerated between(starttime..endtime)\n| mv-expand(RequestContext)\n| extend RequestContextExtended = split(RequestTarget, \"/\")\n| extend Subscription = tostring(RequestContextExtended[2]), ResourceGroups = tostring(RequestContextExtended[4]), Workspace = tostring(RequestContextExtended[8])\n| summarize make_set(Workspace), count(), CurrWorkspaceCount=dcount(Workspace) by AADEmail\n) on AADEmail\n| where CurrWorkspaceCount > HistWorkspaceCount\n// Uncomment follow rows to see queries made by these users\n//| join (\n//LAQueryLogs\n//| where TimeGenerated between(starttime..endtime)\n//on AADEmail\n//| extend timestamp = TimeGenerated, AccountCustomEntity = AADEmail\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This hunting query looks for increases in the number of workspaces queried by a user."
+          },
+          {
+            "name": "tactics",
+            "value": "Collection,Exfiltration"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1530,T1213,T1020"
+          }
+        ]
+      }
+    }
+  ]
+}

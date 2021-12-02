@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/DNS_HighReverseDNSCount')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "High reverse DNS count by host",
+        "category": "Hunting Queries",
+        "query": "\nlet threshold = 10;\nDnsEvents \n| where Name contains \"in-addr.arpa\" \n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), NameCount = dcount(Name), Names = make_set(Name), ClientIPCount = count() by ClientIP\n| where NameCount > threshold\n| extend timestamp = StartTime, IPCustomEntity = ClientIP\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Clients with a high reverse DNS count could be carrying out reconnaissance or discovery activity."
+          },
+          {
+            "name": "tactics",
+            "value": "Discovery"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1046"
+          }
+        ]
+      }
+    }
+  ]
+}

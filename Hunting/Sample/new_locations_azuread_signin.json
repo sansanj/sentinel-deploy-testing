@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/new_locations_azuread_signin')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Azure Active Directory signins from new locations",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = starttime - 14d;\nlet countThreshold = 1;\nSigninLogs\n| where TimeGenerated between(starttime..endtime)\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), perIdentityAuthCount = count()\nby Identity, locationString = strcat(tostring(LocationDetails[\"countryOrRegion\"]), \"/\", tostring(LocationDetails[\"state\"]), \"/\",\ntostring(LocationDetails[\"city\"]), \";\" , tostring(LocationDetails[\"geoCoordinates\"]))\n| summarize StartTime = min(StartTimeUtc), EndTime = max(EndTimeUtc), distinctAccountCount = count(), identityList=makeset(Identity) by locationString\n| extend identityList = iff(distinctAccountCount<10, identityList, \"multiple (>10)\")\n| join kind= anti (\nSigninLogs\n  | where TimeGenerated between(lookback..starttime)\n  | project locationString= strcat(tostring(LocationDetails[\"countryOrRegion\"]), \"/\", tostring(LocationDetails[\"state\"]), \"/\",\n  tostring(LocationDetails[\"city\"]), \";\" , tostring(LocationDetails[\"geoCoordinates\"]))\n  | summarize priorCount = count() by locationString\n)\non locationString\n// select threshold above which #new accounts from a new location is deemed suspicious\n| where distinctAccountCount > countThreshold\n| extend timestamp = StartTime\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "New Azure Active Directory signin locations today versus historical Azure Active Directory signin data.\nIn the case of password spraying or brute force attacks one might see authentication attempts for many\naccounts from a new location."
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1078"
+          }
+        ]
+      }
+    }
+  ]
+}

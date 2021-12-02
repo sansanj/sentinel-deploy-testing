@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/SQL-UserRemovedFromServerRole')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "User removed from SQL Server Roles",
+        "category": "Hunting Queries",
+        "query": "\n// SQLEvent is not the table name, it is the function name that should already be imported into your workspace.\n// The underlying table where the data exists is the Event table.\n// This query checks for user removed from a ServerRole\nSQLEvent\n| where Statement has \"Alter Server role\" and Statement has \"drop member\"\n| parse Statement with * \"DROP MEMBER [\" TargetUser:string \"]\" *\n| project TimeGenerated, Computer, Action, ClientIP, CurrentUser, DatabaseName, TargetUser, ObjectName, Statement \n| extend timestamp = TimeGenerated, AccountCustomEntity = CurrentUser, IPCustomEntity = ClientIP  \n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "his hunting query identifies user removed from a SQL Server Role.\nThis query is based on the SQLEvent KQL Parser function (link below) \nSQLEvent KQL Parser provided at https://github.com/Azure/Azure-Sentinel/tree/master/Parsers/SQLSever\nDet"
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence,PrivilegeEscalation,Impact"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1098,T1078,T1496"
+          }
+        ]
+      }
+    }
+  ]
+}

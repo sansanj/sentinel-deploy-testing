@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/signinBurstFromMultipleLocations')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Azure Active Directory sign-in burst from multiple locations",
+        "category": "Hunting Queries",
+        "query": "\nlet signIns = SigninLogs\n| extend locationString= strcat(tostring(LocationDetails[\"countryOrRegion\"]), \"/\",\n tostring(LocationDetails[\"state\"]), \"/\", tostring(LocationDetails[\"city\"]))\n| where locationString != \"//\" \n// filter out signins associated with top 100 signin locations \n| join kind=anti (\nSigninLogs\n  | extend locationString= strcat(tostring(LocationDetails[\"countryOrRegion\"]), \"/\", \n  tostring(LocationDetails[\"state\"]), \"/\", tostring(LocationDetails[\"city\"]))\n  | where locationString != \"//\"\n  | summarize count() by locationString\n  | order by count_ desc\n  | take 100) on locationString ; // TODO - make this threshold percentage-based\n// We will perform a time window join to identify signins from multiple locations within a 10-minute period\nlet lookupWindow = 10m;\nlet lookupBin = lookupWindow / 2.0; // lookup bin = equal to 1/2 of the lookup window\nsignIns \n| project-rename Start=TimeGenerated \n| extend TimeKey = bin(Start, lookupBin)\n| join kind = inner (\nsignIns \n| project-rename End=TimeGenerated, EndLocationString=locationString \n  // TimeKey on the right side of the join - emulates this authentication appearing several times\n  | extend TimeKey = range(bin(End - lookupWindow, lookupBin),\n  bin(End, lookupBin), lookupBin)\n  | mvexpand TimeKey to typeof(datetime) // translate TimeKey arrange range to a column\n) on Identity, TimeKey\n| where End > Start\n| project timeSpan = End - Start, Identity, locationString, EndLocationString,tostring(Start), tostring(End), UserPrincipalName\n| where locationString != EndLocationString\n| summarize by timeSpan, Identity, locationString, EndLocationString, Start, End, UserPrincipalName\n| extend timestamp = Start, AccountCustomEntity = UserPrincipalName \n| order by Identity\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Highlights accounts associated with multiple authentications from different geographical locations in a short period of time."
+          },
+          {
+            "name": "tactics",
+            "value": "CredentialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1110"
+          }
+        ]
+      }
+    }
+  ]
+}

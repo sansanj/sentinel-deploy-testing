@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/InactiveAccounts')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Inactive or new account signins",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = starttime - 14d;\nlet midtime = starttime - 7d;\nSigninLogs\n| where TimeGenerated between(starttime..endtime)\n// successful sign-in\n| where ResultType == 0\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), loginCountToday=count() by UserPrincipalName, Identity\n| join kind=leftanti (\n   SigninLogs\n   // historical successful sign-in\n   | where TimeGenerated between(lookback..starttime)\n   | where ResultType == 0\n   | summarize by UserPrincipalName, Identity\n) on UserPrincipalName\n| join kind= leftanti (\n   // filter out newly created user accounts\n   AuditLogs\n   | where TimeGenerated between(midtime..starttime)\n   | where OperationName == \"Add user\"\n   // Normalize to lower case in order to match against equivalent UPN in Signin logs\n   | extend NewUserPrincipalName = tolower(extractjson(\"$.userPrincipalName\", tostring(TargetResources[0]), typeof(string)))\n) on $left.UserPrincipalName == $right.NewUserPrincipalName\n| extend timestamp = StartTime, AccountCustomEntity = UserPrincipalName\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Query for accounts seen signing in for the first time - these could be associated\nwith stale/inactive accounts that ought to have been deleted but were not - and have\nsubseuqently been compromised.\nResults for user accounts created in the l"
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1078"
+          }
+        ]
+      }
+    }
+  ]
+}

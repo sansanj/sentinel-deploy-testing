@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/new_sharepoint_downloads_by_IP')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "SharePointFileOperation via previously unseen IPs",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = starttime - 14d;\nlet historicalActivity=\nOfficeActivity\n| where  RecordType == \"SharePointFileOperation\"\n| where Operation in (\"FileDownloaded\", \"FileUploaded\")\n| where TimeGenerated between(lookback..starttime)\n| summarize historicalCount=count() by ClientIP;\nlet recentActivity = OfficeActivity\n| where  RecordType == \"SharePointFileOperation\"\n| where Operation in (\"FileDownloaded\", \"FileUploaded\")\n| where TimeGenerated between(starttime..endtime)\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), recentCount=count() by ClientIP;\nrecentActivity | join kind= leftanti (\n   historicalActivity\n) on ClientIP\n| extend timestamp = StartTime, IPCustomEntity = ClientIP\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Shows volume of documents uploaded to or downloaded from Sharepoint by new IP addresses.\nIn stable environments such connections by new IPs may be unauthorized, especially if associated with\nspikes in volume which could be associated with l"
+          },
+          {
+            "name": "tactics",
+            "value": "Exfiltration"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1030"
+          }
+        ]
+      }
+    }
+  ]
+}

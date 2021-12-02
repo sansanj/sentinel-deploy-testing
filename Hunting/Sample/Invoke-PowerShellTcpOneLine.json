@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/Invoke-PowerShellTcpOneLine')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Invoke-PowerShellTcpOneLine Usage.",
+        "category": "Hunting Queries",
+        "query": "SecurityEvent\n| where EventID == 4688\n| where Process has_any (\"powershell.exe\", \"PowerShell_ISE.exe\", \"cmd.exe\")\n| where CommandLine has \"$client = New-Object System.Net.Sockets.TCPClient\"\n| extend timestamp = TimeGenerated, AccountCustomEntity = Account, HostCustomEntity = Computer, IPCustomEntity = IpAddress\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Invoke-PowerShellTcpOneLine is a PowerShell script to create a simple and small reverse shell. It can be abused by attackers to exfiltrate data. This query looks for command line activity similar to Invoke-PowerShellTcpOneLine."
+          },
+          {
+            "name": "tactics",
+            "value": "Exfiltration"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1011"
+          }
+        ]
+      }
+    }
+  ]
+}

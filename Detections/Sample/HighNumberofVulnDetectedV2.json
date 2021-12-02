@@ -1,0 +1,42 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    },
+    "analytic-id": {
+      "type": "string",
+      "defaultValue": "13caa35c-0fb0-43a9-9418-adb23fa32777",
+      "minLength": 1,
+      "metadata": {
+        "description": "Unique id for the scheduled alert rule"
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/',parameters('analytic-id'))]",
+      "apiVersion": "2020-01-01",
+      "kind": "Scheduled",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "description": "This Creates an incident when a host has a high number of Urgent, severity 5, vulnerabilities detected.",
+        "displayName": "High Number of Urgent Vulnerabilities Detected",
+        "enabled": false,
+        "query": "\nlet threshold = 10;\nQualysHostDetectionV2_CL\n| where Severity_s == \"5\"\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), count() by NetBios_s, IPAddress\n| where count_ >= threshold\n| extend timestamp = StartTime, HostCustomEntity = NetBios_s, IPCustomEntity = IPAddress\n",
+        "queryFrequency": "PT1H",
+        "queryPeriod": "PT1H",
+        "severity": "Medium",
+        "suppressionDuration": "PT1H",
+        "suppressionEnabled": false,
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "tactics": [
+          "InitialAccess"
+        ]
+      }
+    }
+  ]
+}

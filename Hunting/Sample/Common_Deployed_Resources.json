@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/Common_Deployed_Resources')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Common deployed resources",
+        "category": "Hunting Queries",
+        "query": "\nAzureActivity\n| where OperationNameValue has_any (@\"deployments/write\", @\"virtualMachines/write\")  \n| where ActivityStatusValue == \"Succeeded\"\n| summarize by bin(TimeGenerated,1h), Resource, ResourceGroup, OperationNameValue, Caller\n| evaluate basket()\n| where isnotempty(Caller) and isnotempty(Resource) and isnotempty(TimeGenerated)\n| order by Percent desc, TimeGenerated desc\n| extend timestamp = TimeGenerated\n// remove comments below on filters if the goal is to see more common or more rare Resource, Resource Group and Caller combinations\n//| where Percent <= 40 // <-- more rare\n//| where Percent >= 60 // <-- more common\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This query looks for common deployed resources (resource name and resource groups) and can be used\nin combination with other signals that show suspicious deployment to evaluate if the resource is one\nthat is commonly being deployed/created "
+          },
+          {
+            "name": "tactics",
+            "value": "Impact"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1496"
+          }
+        ]
+      }
+    }
+  ]
+}

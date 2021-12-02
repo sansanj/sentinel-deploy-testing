@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/imProcess_HostExportingMailboxAndRemovingExport')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Host Exporting Mailbox and Removing Export (Normalized Process Events)",
+        "category": "Hunting Queries",
+        "query": "\n// Adjust the timeframe to change the window events need to occur within to alert\n let timeframe = 1h;\n imProcessCreate\n | where Process has_any (\"powershell.exe\", \"cmd.exe\")\n | where CommandLine has 'New-MailboxExportRequest'\n | summarize by Dvc, timekey = bin(TimeGenerated, timeframe), CommandLine, ActorUsername, EventVendor, EventProduct\n | join kind=inner (imProcessCreate\n | where Process has_any (\"powershell.exe\", \"cmd.exe\")\n | where CommandLine has 'Remove-MailboxExportRequest'\n | summarize by Dvc, EventProduct, EventVendor, timekey = bin(TimeGenerated, timeframe), CommandLine, ActorUsername) on Dvc, timekey, ActorUsername\n | summarize by timekey, Dvc, CommandLine, ActorUsername\n | project-reorder timekey, Dvc, ActorUsername, CommandLine\n | extend HostCustomEntity = Dvc, AccountCustomEntity = ActorUsername\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This hunting query looks for hosts exporting a mailbox from an on-prem Exchange server, followed by\nthat same host removing the export within a short time window. This pattern has been observed by attackers \nwhen exfiltrating emails from a "
+          },
+          {
+            "name": "tactics",
+            "value": "Collection"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1114"
+          }
+        ]
+      }
+    }
+  ]
+}

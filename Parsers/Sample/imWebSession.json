@@ -1,0 +1,25 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-08-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/imWebSessions')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "etag": "*",
+        "displayName": "Source Agnostic Web Sessions parser",
+        "category": "Security",
+        "FunctionAlias": "imWebSessions",
+        "query": "let WebSessionsGeneric=(){\nunion isfuzzy=true\n  vimNetworkSessionEmpty\n};\nWebSessionsGeneric",
+        "version": 1
+      }
+    }
+  ]
+}

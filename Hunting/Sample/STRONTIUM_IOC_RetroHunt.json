@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/STRONTIUM_IOC_RetroHunt')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Retrospective hunt for STRONTIUM IP IOCs",
+        "category": "Hunting Queries",
+        "query": "\nlet STRONTIUM_IPS = dynamic([\"82.118.242.171\" , \"167.114.153.55\" , \"94.237.37.28\", \"31.220.61.251\" , \"128.199.199.187\" ]);\n(union isfuzzy=true\n(CommonSecurityLog\n| where TimeGenerated between (startofday(datetime(2019-02-01)) .. endofday(datetime(2019-08-05)))\n| where SourceIP in (STRONTIUM_IPS) or DestinationIP in (STRONTIUM_IPS)\n| extend IPCustomEntity = SourceIP\n),\n(SecurityAlert\n| where TimeGenerated between (startofday(datetime(2019-02-01)) .. endofday(datetime(2019-08-05)))\n| extend RemoteAddress = iff(ExtendedProperties has \"RemoteAddress\", tostring(parse_json(ExtendedProperties)[\"RemoteAddress\"]), \"None\")\n| where RemoteAddress != \"None\"\n| where RemoteAddress in (STRONTIUM_IPS)\n| extend IPCustomEntity = RemoteAddress\n) \n)\n| extend timestamp = TimeGenerated\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Matches domain name IOCs related to Strontium group activity with CommonSecurityLog and SecurityAlert dataTypes.\nThe query is scoped in the time window that these IOCs were active.\nReferences: https://blogs.microsoft.com/on-the-issues/2019/"
+          },
+          {
+            "name": "tactics",
+            "value": "CommandAndControl"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1071"
+          }
+        ]
+      }
+    }
+  ]
+}

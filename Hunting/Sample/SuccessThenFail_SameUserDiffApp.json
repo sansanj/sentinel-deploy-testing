@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/SuccessThenFail_SameUserDiffApp')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Same User - Successful logon for a given App and failure on another App within 1m and low distribution",
+        "category": "Hunting Queries",
+        "query": "\nlet logonDiff = 1m;\nlet Success = SigninLogs\n| where ResultType == \"0\"\n| where AppDisplayName !in (\"Office 365 Exchange Online\", \"Skype for Business Online\", \"Office 365 SharePoint Online\")\n| project SuccessLogonTime = TimeGenerated, UserPrincipalName, IPAddress , SuccessAppDisplayName = AppDisplayName;\nlet Fail = SigninLogs\n| where ResultType !in (\"0\", \"50140\")\n| where ResultDescription !~ \"Other\"\n| where AppDisplayName !in (\"Office 365 Exchange Online\", \"Skype for Business Online\", \"Office 365 SharePoint Online\")\n| project FailedLogonTime = TimeGenerated, UserPrincipalName, IPAddress , FailedAppDisplayName = AppDisplayName, ResultType, ResultDescription;\nlet InitialDataSet =\nSuccess | join kind= inner (\nFail\n) on UserPrincipalName, IPAddress\n| where isnotempty(FailedAppDisplayName)\n| where SuccessLogonTime < FailedLogonTime and FailedLogonTime - SuccessLogonTime <= logonDiff and SuccessAppDisplayName != FailedAppDisplayName;\nlet InitialHits =\nInitialDataSet\n| summarize FailedLogonTime = min(FailedLogonTime), SuccessLogonTime = min(SuccessLogonTime)\nby UserPrincipalName, SuccessAppDisplayName, FailedAppDisplayName, IPAddress, ResultType, ResultDescription;\n// Only take hits where there is 5 or less distinct AppDisplayNames on the success side as this limits highly active applications where failures occur more regularly\nlet Distribution =\nInitialDataSet\n| summarize count(SuccessAppDisplayName) by SuccessAppDisplayName, ResultType\n| where count_SuccessAppDisplayName <= 5;\nInitialHits | join (\n   Distribution\n) on SuccessAppDisplayName, ResultType\n| project UserPrincipalName, SuccessLogonTime, IPAddress, SuccessAppDisplayName, FailedLogonTime, FailedAppDisplayName, ResultType, ResultDescription\n| extend timestamp = SuccessLogonTime, AccountCustomEntity = UserPrincipalName, IPCustomEntity = IPAddress\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This identifies when a user account successfully logs onto a given App and within 1 minute fails to logon to a different App.\nThis may indicate a malicious attempt at accessing disallowed Apps for discovery or potential lateral movement"
+          },
+          {
+            "name": "tactics",
+            "value": "Discovery,LateralMovement"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1087,T1021"
+          }
+        ]
+      }
+    }
+  ]
+}

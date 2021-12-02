@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/VIPAccountFailedLogons')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "VIP account more than 6 failed logons in 10",
+        "category": "Hunting Queries",
+        "query": "\n// Create DataTable with your own values, example below shows dummy usernames that are authorized and for what domain\nlet List = datatable(VIPUser:string, Domain:string)[\"Bob\", \"Domain\", \"joe\", \"domain\", \"MATT\", \"DOMAIN\"];\nList | extend Account = strcat(Domain,\"\\\\\",VIPUser) | join kind= inner (\nSecurityEvent \n| where EventID == \"4625\"\n| where AccountType == \"User\"\n| where LogonType == \"2\" or LogonType == \"3\"\n) on Account \n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), FailedVIPLogons = count() by LogonType, Account\n| where FailedVIPLogons >= 6\n| extend timestamp = StartTimeUtc, AccountCustomEntity = Account\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "VIP Account with more than 6 failed logon attempts in 10 minutes, include your own VIP list in the table below"
+          },
+          {
+            "name": "tactics",
+            "value": "CredentialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1110"
+          }
+        ]
+      }
+    }
+  ]
+}

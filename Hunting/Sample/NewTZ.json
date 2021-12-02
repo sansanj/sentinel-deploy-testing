@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/NewTZ')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "New time zone observed",
+        "category": "Hunting Queries",
+        "query": "\nlet previous_tz = (\n  ZoomLogs\n  | where Event =~ \"meeting.participant_joined\"\n  | extend TimeZone = columnifexists('payload_object_timezone_s', \"\")\n  | summarize by TimeZone\n);\nZoomLogs\n| where Event =~ \"meeting.participant_joined\"\n| extend TimeZone = columnifexists('payload_object_timezone_s', \"\")\n| where isnotempty(TimeZone) and TimeZone in (previous_tz)\n| extend timestamp = TimeGenerated, AccountCustomEntity = User\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This hunting query identifies users joining a meeting from a time zone that a user has not been observed from in the last 30 days."
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1078"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/DormantServicePrincipalUpdateCredsandLogsIn')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Dormant Service Principal Update Creds and Logs In",
+        "category": "Hunting Queries",
+        "query": "let starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = endtime - 14d;\nlet sp_active_users = AADServicePrincipalSignInLogs\n| where TimeGenerated between(lookback..starttime)\n| where ResultType  == 0\n| summarize by ServicePrincipalId;\nAuditLogs\n| where TimeGenerated between(starttime..endtime)\n// Looking for new creds added to an SP rather than MFA\n| where OperationName in (\"Add service principal credentials\", \"Update application - Certificates and secrets management\")\n| extend ServicePrincipalId = tostring(TargetResources[0].id)\n| where ServicePrincipalId !in (sp_active_users)\n| join kind=inner (SigninLogs | where TimeGenerated between(starttime..endtime) | where ResultType == 0) on ServicePrincipalId\n| extend AccountCustomEntity = ServicePrincipalId, IPCustomEntity = IPAddress\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This query look for Service Principal accounts that are no longer used where a user has added or updated credentials for them before logging in with the Service Principal.\n Threat actors may look to re-activate dormant accounts and use them"
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1098"
+          }
+        ]
+      }
+    }
+  ]
+}

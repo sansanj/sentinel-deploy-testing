@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/imProcess_NishangReverseTCPShellBase64')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Nishang Reverse TCP Shell in Base64 (Normalized Process Events)",
+        "category": "Hunting Queries",
+        "query": "imProcessCreate\n| where Process has_any (\"powershell.exe\",\"powershell_ise.exe\") and CommandLine contains \"-e\" \n| mvexpand SS = split(CommandLine, \" \") \n| where SS matches regex \"[A-Za-z0-9+/]{50,}[=]{0,2}\" \n| extend DecodeString = base64_decode_tostring(tostring(SS)) \n| extend FinalString = replace(\"\\\\0\", \"\", DecodeString) \n| where FinalString has \"tcpclient\" and FinalString contains \"$\" and (FinalString contains \"invoke\" or FinalString contains \"iex\") \n| extend timestamp = TimeGenerated, AccountCustomEntity = User, HostCustomEntity = Dvc\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Looks for Base64-encoded commands associated with the Nishang reverse TCP shell.\nRef: https://github.com/samratashok/nishang/blob/master/Shells/Invoke-PowerShellTcp.ps1"
+          },
+          {
+            "name": "tactics",
+            "value": "Exfiltration"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1011"
+          }
+        ]
+      }
+    }
+  ]
+}

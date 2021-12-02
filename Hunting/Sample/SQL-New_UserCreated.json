@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/SQL-New_UserCreated')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "New User created on SQL Server",
+        "category": "Hunting Queries",
+        "query": "\n// SQLEvent is not the table name, it is the function name that should already be imported into your workspace.\n// The underlying table where the data exists is the Event table.\n// This query checks for new user account created on SQL Server using the SQLEvent() parser\n//\nSQLEvent\n| where Statement has \"Create Login\"\n| parse Statement with \"CREATE LOGIN [\" TargetUser:string \"]\" *\n| project TimeGenerated, Computer, Action, ClientIP, CurrentUser, DatabaseName, TargetUser, ObjectName, Statement\n| extend timestamp = TimeGenerated, AccountCustomEntity = CurrentUser, IPCustomEntity = ClientIP \n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "his hunting query identifies creation of a new user from SQL Server\nThis query is based on the SQLEvent KQL Parser function (link below) \nSQLEvent KQL Parser provided at https://github.com/Azure/Azure-Sentinel/tree/master/Parsers/SQLSever\nD"
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1136"
+          }
+        ]
+      }
+    }
+  ]
+}

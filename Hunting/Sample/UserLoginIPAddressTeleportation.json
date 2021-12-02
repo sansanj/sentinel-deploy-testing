@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/UserLoginIPAddressTeleportation')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "User Login IP Address Teleportation",
+        "category": "Hunting Queries",
+        "query": "\nlet windowTime = 20min / 2; //Window to lookup anomalous logins within\nlet excludeKnownVPN = dynamic(['127.0.0.1', '0.0.0.0']); //Known VPN IP addresses to exclude\nSigninLogs\n| where ConditionalAccessStatus =~ \"success\"\n| extend country = LocationDetails['countryOrRegion']\n| where country != \"\"\n| summarize count() by tostring(country)\n| join (\n    //Get the total number of logins from any country and join it to the previous count in a single table\n    SigninLogs\n    | where ConditionalAccessStatus =~ \"success\"\n    | extend country = LocationDetails['countryOrRegion']\n    | where country != \"\"\n    | summarize count(), make_list(tostring(country))\n    | mv-expand list_country\n    | extend country = tostring(list_country)\n) on country\n| summarize by country, count_, count_1\n//Now calculate each countries prevalence within login events\n| extend prevalence = toreal(count_) / toreal(count_1) * 100\n| project-away count_1\n| where prevalence < 0.01\n| join kind=rightsemi(\n    SigninLogs\n    //Enable to limit to o365 exchange logins\n    //| where AppDisplayName =~ \"Office 365 Exchange Online\"\n    | where ConditionalAccessStatus =~ \"success\"\n    | where IPAddress != \"\"\n    | extend country = tostring(LocationDetails['countryOrRegion'])\n    | summarize count() by TimeGenerated, UserPrincipalName, country, IPAddress\n) on country\n| join kind=leftouter (\n    SigninLogs\n    //Enable to limit to o365 exchange logins\n    //| where AppDisplayName =~ \"Office 365 Exchange Online\"\n    | where ConditionalAccessStatus =~ \"success\"\n    | extend country = tostring(LocationDetails['countryOrRegion'])\n    | summarize by TimeGenerated, IPAddress, UserPrincipalName, country\n) on UserPrincipalName\n| where IPAddress != IPAddress1 and country != country1\n| extend WindowStart = TimeGenerated1 - windowTime\n| extend WindowEnd = TimeGenerated1 + windowTime\n| where TimeGenerated between (WindowStart .. WindowEnd)\n| project Account=UserPrincipalName, AnomalousIP=IPAddress, AnomalousLoginTime=TimeGenerated, AnomalousCountry=country, OtherLoginIP=IPAddress1, OtherLoginCountry=country1, OtherLoginWindowStart=WindowStart, OtherLoginWindowEnd=WindowEnd\n| where AnomalousIP !in(excludeKnownVPN) and OtherLoginIP !in(excludeKnownVPN)\n| extend timestamp = AnomalousLoginTime, AccountCustomEntity = Account, IPCustomEntity = AnomalousIP\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This query over SiginLogs will identify user accounts that have logged in from two different countries\nwithin a specified time window, by default this is a 10 minute window either side of the previous login.\nThis query will detect users roa"
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1078"
+          }
+        ]
+      }
+    }
+  ]
+}

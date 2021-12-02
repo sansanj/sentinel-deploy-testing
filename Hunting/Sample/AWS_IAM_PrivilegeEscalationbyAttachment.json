@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/AWS_IAM_PrivilegeEscalationbyAttachment')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "IAM Privilege Escalation by Instance Profile attachment",
+        "category": "Hunting Queries",
+        "query": "\n// Creating separate table for RemoveRoleToInstanceProfile\nlet RemoveRole=AWSCloudTrail\n| where  EventName in~ (\"RemoveRoleFromInstanceProfile\") and isempty(ErrorMessage)\n| extend RoleRemoved = tostring(parse_json(RequestParameters).roleName), InstanceProfileName = tostring(parse_json(RequestParameters).instanceProfileName), TimeRemoved=TimeGenerated\n| extend UserIdentityUserName = iff(isnotempty(UserIdentityUserName), UserIdentityUserName, tostring(split(UserIdentityArn,'/')[-1]))\n| summarize RoleRemovedCount= dcount(TimeRemoved) by TimeRemoved, EventName, EventTypeName, UserIdentityArn, UserIdentityUserName, UserIdentityAccountId, UserIdentityPrincipalid, UserAgent, \nSourceIpAddress, AWSRegion, EventSource, RoleRemoved, InstanceProfileName;\n// Creating separate table for AddRoleToInstanceProfile\nlet AddRole=AWSCloudTrail\n| where  EventName in~ (\"AddRoleToInstanceProfile\") and isempty(ErrorMessage)\n| extend UserIdentityUserName = iff(isnotempty(UserIdentityUserName), UserIdentityUserName, tostring(split(UserIdentityArn,'/')[-1]))\n| extend RoleAdded = tostring(parse_json(RequestParameters).roleName), InstanceProfileName = tostring(parse_json(RequestParameters).instanceProfileName), TimeAdded=TimeGenerated\n| summarize RoleAddedCount= dcount(TimeAdded) by TimeAdded, EventName, EventTypeName, UserIdentityArn, UserIdentityUserName, UserIdentityAccountId, UserIdentityPrincipalid, UserAgent, \nSourceIpAddress, AWSRegion, EventSource, RoleAdded, InstanceProfileName;\n//Joining both operations from the same source IP, user and instance profile name\nRemoveRole\n| join kind= inner (\n   AddRole \n) on AWSRegion,SourceIpAddress, InstanceProfileName, UserIdentityUserName\n| where TimeAdded  > TimeRemoved // Checking if RoleAdd operation was performed after removal\n| summarize TotalCount=count() by TimeAdded, TimeRemoved, RoleAdded, RoleRemoved, UserIdentityUserName, UserIdentityAccountId, UserIdentityPrincipalid, UserAgent,\nSourceIpAddress, AWSRegion, EventSource, RoleRemovedCount, RoleAddedCount\n| extend timestamp = iff(TimeAdded > TimeRemoved,TimeAdded, TimeRemoved), IPCustomEntity = SourceIpAddress, AccountCustomEntity = UserIdentityUserName\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "An instance profile is a container for an IAM role that you can use to pass role information to an EC2 instance when the instance start.\nIdentifies when existing role is removed and new/existing high privileged role is added to instance pro"
+          },
+          {
+            "name": "tactics",
+            "value": "PrivilegeEscalation"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1098"
+          }
+        ]
+      }
+    }
+  ]
+}

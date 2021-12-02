@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/AnomalousLogintoDevices')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Anomalous Login to Devices",
+        "category": "Hunting Queries",
+        "query": "\nBehaviorAnalytics\n| where UsersInsights.IsDormantAccount == true\n| where DevicesInsights.IsLocalAdmin == true\n| where ActivityType == \"LogOn\"\n| where ActionType == \"InteractiveLogon\"\n| where ActivityInsights contains \"True\"\n| project TimeGenerated, UserName, UserPrincipalName, UsersInsights, ActivityType, ActionType,ActivityInsights ,SourceIPAddress, SourceIPLocation, SourceDevice, DevicesInsights\n| extend timestamp = TimeGenerated\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Adversaries may steal the credentials of a specific user or service account using Credential Access techniques or capture credentials earlier in their reconnaissance process through social engineering for means of gaining Initial Access. AP"
+          },
+          {
+            "name": "tactics",
+            "value": "PrivilegeEscalation"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1078"
+          }
+        ]
+      }
+    }
+  ]
+}

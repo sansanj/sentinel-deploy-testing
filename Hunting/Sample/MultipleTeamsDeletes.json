@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/MultipleTeamsDeletes')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Multiple Teams deleted by a single user",
+        "category": "Hunting Queries",
+        "query": "\n// Adjust this value to change how many Teams should be deleted before including\nlet max_delete = 3;\nlet deleting_users = (\nOfficeActivity\n| where OfficeWorkload =~ \"MicrosoftTeams\"\n| where Operation =~ \"TeamDeleted\"\n| summarize count() by UserId\n| where count_ > max_delete\n| project UserId);\nOfficeActivity\n| where OfficeWorkload =~ \"MicrosoftTeams\"\n| where Operation =~ \"TeamDeleted\"\n| where UserId in (deleting_users)\n| extend timestamp = TimeGenerated, AccountCustomEntity = UserId\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This hunting query identifies where multiple Teams have been deleted by a single user in a short timeframe."
+          },
+          {
+            "name": "tactics",
+            "value": "Impact"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1485,T1489"
+          }
+        ]
+      }
+    }
+  ]
+}

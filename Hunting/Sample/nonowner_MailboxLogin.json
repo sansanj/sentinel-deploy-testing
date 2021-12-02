@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/nonowner_MailboxLogin')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Non-owner mailbox login activity",
+        "category": "Hunting Queries",
+        "query": "\nOfficeActivity\n| where Operation == \"MailboxLogin\" and Logon_Type != \"Owner\" \n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), count() by Operation, OrganizationName, UserType, UserId, MailboxOwnerUPN, Logon_Type, ClientIP\n| extend timestamp = StartTime, AccountCustomEntity = UserId, IPCustomEntity = ClientIP\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This will help you determine if mailbox access observed with Admin/Delegate Logontype. \nThe logon type indicates mailbox accessed from non-owner user. Exchange allows Admin \nand delegate permissions to access other user's inbox.\nIf your org"
+          },
+          {
+            "name": "tactics",
+            "value": "Collection,Exfiltration"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1114,T1020"
+          }
+        ]
+      }
+    }
+  ]
+}

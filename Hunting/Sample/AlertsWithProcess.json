@@ -1,0 +1,34 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/AlertsWithProcess')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Alerts With This Process",
+        "category": "Hunting Queries",
+        "query": "\nlet GetAllAlertsWithProcess = (suspiciousEventTime:datetime, v_Process:string){\nlet v_StartTime = suspiciousEventTime-1d;\nlet v_EndTime = suspiciousEventTime+1d;\nSecurityAlert\n| where TimeGenerated between (v_StartTime .. v_EndTime)\n| where Entities has v_Process\n| extend Extprop = parse_json(Entities)\n| mv-expand Extprop\n| extend Extprop = parse_json(Extprop)\n| extend CmdLine = iff(Extprop['Type']==\"process\", Extprop['CommandLine'], '')\n| extend File = iff(Extprop['Type']==\"file\", Extprop['Name'], '')\n| extend Account = Extprop['Name']\n| extend Domain = Extprop['UPNSuffix']\n| extend Account = iif(isnotempty(Domain) and Extprop['Type']==\"account\", tolower(strcat(Account, \"@\", Domain)), iif(Extprop['Type']==\"account\", tolower(Account), \"\"))\n| extend Computer = iff(Extprop['Type']==\"host\", Extprop['HostName'], '')\n| extend IpAddress = iff(Extprop[\"Type\"] == \"ip\",Extprop['Address'], '')\n| extend Process = iff(isnotempty(CmdLine), CmdLine, File)\n| summarize max(TimeGenerated), make_set(AlertName), make_set(Process), make_set(Computer), make_set(Account), make_set(IpAddress), make_set(Entities) by SystemAlertId\n| project TimeGenerated = max_TimeGenerated, AlertName=set_AlertName[0], Process=set_Process[1], Account = set_Account[1], Computer=set_Computer[0], IPAddress = set_IpAddress[1], Entities=set_Entities\n| extend timestamp = TimeGenerated, AccountCustomEntity = Account, HostCustomEntity = Computer, IPCustomEntity = IPAddress\n| top 10 by TimeGenerated desc nulls last\n};\n// change datetime value and <processname> value below\nGetAllAlertsWithProcess(datetime('2019-01-18T10:36:07Z'), \"<processname>\")\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Any Alerts that fired on any host with this same process in the range of +-1d"
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence,Discovery,LateralMovement,Collection"
+          }
+        ]
+      }
+    }
+  ]
+}

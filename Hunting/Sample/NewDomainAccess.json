@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/NewDomainAccess')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "New domain added to Whitelist",
+        "category": "Hunting Queries",
+        "query": "\nZoomLogs \n| where Event =~ \"account.settings_updated\"\n| extend NewDomains = columnifexists(\"payload_object_enforce_logon_domains\", \"\")\n| where isnotempty(NewDomains)\n| project TimeGenerated, Event, User, NewDomains\n| extend timestamp = TimeGenerated, AccountCustomEntity = User\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This hunting query identifies new domains added to the domain login whitelist in Zoom."
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1098"
+          }
+        ]
+      }
+    }
+  ]
+}

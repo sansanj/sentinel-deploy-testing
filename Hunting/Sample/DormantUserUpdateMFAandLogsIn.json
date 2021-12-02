@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/DormantUserUpdateMFAandLogsIn')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Dormant User Update MFA and Logs In",
+        "category": "Hunting Queries",
+        "query": "let starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = endtime - 14d;\nlet active_users = (\n    SigninLogs\n    | where TimeGenerated between(lookback..starttime)\n    | where ResultType == 0\n    | extend UserPrincipalName == tolower(UserPrincipalName)\n    | summarize by UserId);\nAuditLogs\n| where TimeGenerated between(starttime..endtime)\n// Get users where they added MFA\n| where OperationName =~ \"User registered security info\"\n| extend TargetUser = tolower(tostring(TargetResources[0].userPrincipalName))\n| extend UserId = tostring(TargetResources[0].id)\n// Check and see if this activity was from a user who is considered not active\n| where UserId !in (active_users)\n// Further reduce FP by just looking at users who have successfully logged in recently as well (avoiding hits for users adding MFA but not actually logging in)\n| join kind=inner (SigninLogs | where TimeGenerated  between(starttime..endtime) | where ResultType == 0 | summarize max(TimeGenerated), make_set(IPAddress), make_set(UserAgent), make_set(LocationDetails) by UserPrincipalName, UserId\n) on UserId\n| extend LogonLocation = set_LocationDetails[0], LogonUserAgent = set_UserAgent[0], LogonIP = set_IPAddress[0]\n| project-rename MostRecentLogon = max_TimeGenerated\n| project-reorder TimeGenerated, TargetUser, OperationName, ResultDescription, MostRecentLogon, LogonUserAgent, LogonLocation, LogonIP\n| extend AccountCustomEntity = TargetUser, IPCustomEntity = LogonIP\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This querys look for users accounts that have not been successfully logged into recently, who then have a MFA method added or updated before logging in.\nThreat actors may look to re-activate dormant accounts and use them for access by addin"
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1098"
+          }
+        ]
+      }
+    }
+  ]
+}

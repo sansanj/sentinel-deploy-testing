@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/RareDomainsInCloudLogs')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Rare domains seen in Cloud Logs",
+        "category": "Hunting Queries",
+        "query": "\n// Provide customLimit value with default above domainLimit value so it will not block unless changed\nlet customLimit = 11;\nlet domainLimit = 10;\nlet domainLookback = union isfuzzy=true\n(AuditLogs\n| extend UserPrincipalName = tolower(tostring(TargetResources.[0].userPrincipalName))\n// parse out AuditLog values for various locations where UPN could be\n| extend UserPrincipalName = iff(isnotempty(UserPrincipalName),\nUserPrincipalName, \niif((tostring(InitiatedBy.user.userPrincipalName)=='unknown'), \nextract(\"Email: ([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\\\.[a-zA-Z0-9-.]+)\", 1, tostring(parse_json(TargetResources)[0].displayName)), \nInitiatedBy.user.userPrincipalName))\n| where UserPrincipalName has \"@\" or UserPrincipalName startswith \"NT AUTHORITY\"\n| extend RareDomain = toupper(tostring(split(UserPrincipalName, \"@\")[-1]))\n| where isnotempty(RareDomain) \n| summarize RareDomainCount = count() by Type, RareDomain\n| where RareDomainCount <= domainLimit\n| extend AccountCustomEntity = UserPrincipalName\n// remove comment from below if you would like to have a lower limit for RareDomainCount specific to AuditLog\n//| where RareDomainCount <= customLimit\n),\n(OfficeActivity\n| extend UserPrincipalName = tolower(UserId)\n| where UserPrincipalName has \"@\" or UserPrincipalName startswith \"NT AUTHORITY\"\n| extend RareDomain = toupper(tostring(split(UserPrincipalName, \"@\")[-1]))\n| summarize RareDomainCount = count() by Type, RareDomain\n| where RareDomainCount <= domainLimit\n| extend AccountCustomEntity = UserPrincipalName\n// remove comment from below if you would like to have a lower limit for RareDomainCount specific to OfficeActivity\n//| where RareDomainCount <= customLimit\n),\n(SigninLogs\n| where UserPrincipalName has \"@\" or UserPrincipalName startswith \"NT AUTHORITY\"\n| extend RareDomain = toupper(tostring(split(UserPrincipalName, \"@\")[-1]))\n| summarize RareDomainCount = count() by Type, RareDomain\n| where RareDomainCount <= domainLimit\n// remove comment from below if you would like to have a lower limit for RareDomainCount specific to SigninLogs\n//| where RareDomainCount <= customLimit\n);\nlet AuditLogsRef = domainLookback | join (\n   AuditLogs\n   | extend UserPrincipalName = tolower(tostring(TargetResources.[0].userPrincipalName))\n   | extend UserPrincipalName = iff(isempty(UserPrincipalName), tostring(InitiatedBy.user.userPrincipalName), UserPrincipalName)\n   | extend RareDomain = toupper(tostring(split(UserPrincipalName, \"@\")[-1]))\n   | where isnotempty(RareDomain) \n   | summarize UPNRefCount = count() by TimeGenerated, Type, RareDomain, UserPrincipalName, OperationName, Category, Result\n   | extend AccountCustomEntity = UserPrincipalName\n) on Type, RareDomain;\nlet OfficeActivityRef = domainLookback | join (\n    OfficeActivity\n    | extend UserPrincipalName = tolower(UserId)\n    | where UserPrincipalName has \"@\" or UserPrincipalName startswith \"NT AUTHORITY\"\n    | extend RareDomain = toupper(tostring(split(UserPrincipalName, \"@\")[-1]))\n    | summarize UPNRefCount = count() by TimeGenerated, Type, RareDomain, UserPrincipalName, OperationName = Operation, Category = OfficeWorkload, Result = ResultStatus\n    | extend AccountCustomEntity = UserPrincipalName\n) on Type, RareDomain;\nlet SigninLogsRef = domainLookback | join (\n    SigninLogs\n    | extend UserPrincipalName = tolower(UserId)\n    | where UserPrincipalName has \"@\" or UserPrincipalName startswith \"NT AUTHORITY\"\n    | extend RareDomain = toupper(tostring(split(UserPrincipalName, \"@\")[-1]))\n    | summarize UPNRefCount = count() by TimeGenerated, Type, RareDomain, UserPrincipalName, OperationName, Category = AppDisplayName, Result = ResultType\n    | extend AccountCustomEntity = UserPrincipalName\n) on Type, RareDomain;\nlet Results = union isfuzzy=true\nAuditLogsRef,OfficeActivityRef,SigninLogsRef;\nResults | project TimeGenerated, Type, RareDomain, UserPrincipalName, OperationName, Category, Result, UPNRefCount \n| order by TimeGenerated asc \n| extend timestamp = TimeGenerated, AccountCustomEntity = UserPrincipalName\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This will identify rare domain accounts accessing or attempting to access cloud resources by examining the AuditLogs, OfficeActivity and SigninLogs\nRare does not mean malicious, but it may be something you would be interested in investigati"
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess,Discovery,Collection"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1190,T1087,T1114"
+          }
+        ]
+      }
+    }
+  ]
+}

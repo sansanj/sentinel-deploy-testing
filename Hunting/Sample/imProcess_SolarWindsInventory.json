@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/imProcess_SolarWindsInventory')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "SolarWinds Inventory (Normalized Process Events)",
+        "category": "Hunting Queries",
+        "query": "imProcessCreate\n| where Process has 'solarwinds' \n| extend MachineName = DvcHostname , Process = TargetProcessFilePath\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), MachineCount = dcount(Dvc), AccountCount = dcount(User), MachineNames = make_set(Dvc),\nAccounts = make_set(User) by Process, EventVendor, EventProduct\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Beyond your internal software management systems, it is possible you may not have visibility into your entire footprint of SolarWinds installations.  This is intended to help use process exection information to discovery any systems that ha"
+          },
+          {
+            "name": "tactics",
+            "value": "Execution"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1072"
+          }
+        ]
+      }
+    }
+  ]
+}

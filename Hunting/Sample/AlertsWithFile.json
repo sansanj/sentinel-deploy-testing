@@ -1,0 +1,34 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/AlertsWithFile')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Alerts related to File",
+        "category": "Hunting Queries",
+        "query": "\nlet GetAllAlertsWithFile = (suspiciousEventTime:datetime, v_File:string){\nlet v_StartTime = suspiciousEventTime-1d;\nlet v_EndTime = suspiciousEventTime+1d;\nSecurityAlert\n| where TimeGenerated between (v_StartTime .. v_EndTime)\n| where ExtendedProperties has v_File\n| extend Computer = iff(isnotempty(toupper(tostring(Extprop[\"Compromised Host\"]))), toupper(tostring(Extprop[\"Compromised Host\"])), tostring(parse_json(Entities)[0].HostName))\n| extend Account = iff(isnotempty(tolower(tostring(Extprop[\"User Name\"]))), tolower(tostring(Extprop[\"User Name\"])), tolower(tostring(Extprop[\"user name\"])))\n| extend IpAddress = tostring(parse_json(ExtendedProperties).[\"Client Address\"]) \n| extend timestamp = TimeGenerated, AccountCustomEntity = Account, HostCustomEntity = Computer, IPCustomEntity = IpAddress\n};\n// change datetime value and <filename> value below\nGetAllAlertsWithFile(datetime('2019-01-18T10:36:07Z'), \"<filename>\")\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Any Alerts that fired related to a given File during the range of +6h and -3d"
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence,Discovery,LateralMovement,Collection"
+          }
+        ]
+      }
+    }
+  ]
+}

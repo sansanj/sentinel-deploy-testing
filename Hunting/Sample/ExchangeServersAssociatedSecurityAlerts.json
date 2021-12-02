@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/ExchangeServersAssociatedSecurityAlerts')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Exchange Servers and Associated Security Alerts",
+        "category": "Hunting Queries",
+        "query": "\nW3CIISLog\n| where csUriStem has_any(\"/owa/auth/\", \"/ecp/healthcheck.htm\", \"/ews/exchange.asmx\")\n| summarize by computer=tolower(Computer)\n| join kind=leftouter (\n  SecurityAlert\n  | extend alertData = parse_json(Entities)\n  | mvexpand alertData\n  | where alertData.Type == \"host\"\n  | extend computer = iff(isnotempty(alertData.DnsDomain), tolower(strcat(tostring(alertData.HostName), \".\" , tostring(alertData.DnsDomain))),tolower(tostring(alertData.HostName)))\n  | summarize Alerts=dcount(SystemAlertId), AlertTimes=make_list(TimeGenerated), AlertNames=make_list(AlertName) by computer\n) on computer\n| project ExchangeServer=computer, Alerts, AlertTimes, AlertNames\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This query will dynamically identify Exchange servers using common web paths used by the application in the csUriStem. The query\nwill then collect MDE alerts from the SecurityAlert table using the identified Exchange Server hostnames."
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1190"
+          }
+        ]
+      }
+    }
+  ]
+}

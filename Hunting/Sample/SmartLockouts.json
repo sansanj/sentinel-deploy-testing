@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/SmartLockouts')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Smart Lockouts",
+        "category": "Hunting Queries",
+        "query": "SigninLogs\n| where ResultType == 50053\n| extend AccountCustomEntity = UserPrincipalName, IPCustomEntity = IPAddress\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Identifies accounts that have been locked out by smart lockout policies. Review this results for patterns that might suggest that a password spray is triggering these smart lockout events.\nRef : https://docs.microsoft.com/azure/active-direc"
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1078.004"
+          }
+        ]
+      }
+    }
+  ]
+}

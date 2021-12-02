@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/ExternalUserAddedRemovedInTeams_HuntVersion')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "External user added and removed in a short timeframe - Hunt Version",
+        "category": "Hunting Queries",
+        "query": "\n// If you want to look at user added further than 7 days ago adjust this value\n// If you want to change the timeframe of how quickly accounts need to be added and removed change this value\nlet time_delta = 1h;\nOfficeActivity\n| where OfficeWorkload =~ \"MicrosoftTeams\" \n| where Operation =~ \"MemberAdded\"\n| extend UPN = tostring(parse_json(Members)[0].UPN)\n| where UPN contains (\"#EXT#\")\n| project TimeAdded=TimeGenerated, Operation, UPN, UserWhoAdded = UserId, TeamName, TeamGuid\n| join (\nOfficeActivity\n| where OfficeWorkload =~ \"MicrosoftTeams\" \n| where Operation =~ \"MemberRemoved\"\n| extend UPN = tostring(parse_json(Members)[0].UPN)\n| where UPN contains (\"#EXT#\")\n| project TimeDeleted=TimeGenerated, Operation, UPN, UserWhoDeleted = UserId, TeamName, TeamGuid) on UPN, TeamGuid\n| where TimeDeleted < (TimeAdded + time_delta)\n| project TimeAdded, TimeDeleted, UPN, UserWhoAdded, UserWhoDeleted, TeamName, TeamGuid\n| extend timestamp = TimeAdded, AccountCustomEntity = UPN\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This hunting query identifies external user accounts that are added to a Team and then removed within one hour."
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1136"
+          }
+        ]
+      }
+    }
+  ]
+}

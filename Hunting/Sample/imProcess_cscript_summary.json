@@ -1,0 +1,34 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/imProcess_cscript_summary')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Cscript script daily summary breakdown (Normalized Process Events)",
+        "category": "Hunting Queries",
+        "query": "imProcessCreate\n| where Process has \"cscript.exe\"\n| extend FileName=tostring(split(Process, '\\\\')[-1])\n| where FileName =~ \"cscript.exe\"\n| extend removeSwitches = replace(@\"/+[a-zA-Z0-9:]+\", \"\", CommandLine)\n| extend CommandLine = trim(@\"[a-zA-Z0-9\\\\:\"\"]*cscript(.exe)?(\"\")?(\\s)+\", removeSwitches)\n// handle case where script name is enclosed in \" characters or is not enclosed in quotes \n| extend ScriptName= iff(CommandLine startswith @\"\"\"\", \nextract(@\"([:\\\\a-zA-Z_\\-\\s0-9\\.()]+)(\"\"?)\", 0, CommandLine), \nextract(@\"([:\\\\a-zA-Z_\\-0-9\\.()]+)(\"\"?)\", 0, CommandLine))\n| extend ScriptName=trim(@\"\"\"\", ScriptName) , ScriptNameLength=strlen(ScriptName)\n// extract remainder of commandline as script parameters: \n| extend ScriptParams = iff(ScriptNameLength < strlen(CommandLine), substring(CommandLine, ScriptNameLength +1), \"\")\n| summarize min(TimeGenerated), count() by Dvc, User, ScriptName, ScriptParams, EventVendor, EventProduct\n| order by count_ asc nulls last \n| extend timestamp = min_TimeGenerated, HostCustomEntity = Dvc, AccountCustomEntity = User\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "breakdown of scripts running in the environment"
+          },
+          {
+            "name": "tactics",
+            "value": "Execution"
+          }
+        ]
+      }
+    }
+  ]
+}

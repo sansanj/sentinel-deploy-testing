@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/ADOVariableCreatedDeleted')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Azure DevOps - Variable Created and Deleted",
+        "category": "Hunting Queries",
+        "query": "AzureDevOpsAuditing\n| where OperationName =~ \"Library.VariableGroupModified\"\n| extend variables = Data.Variables\n| extend VariableGroupName = tostring(Data.VariableGroupName)\n| join (AzureDevOpsAuditing\n| where OperationName =~ \"Library.VariableGroupModified\"\n| extend variables = Data.Variables\n| extend VariableGroupName = tostring(Data.VariableGroupName)) on VariableGroupName\n| extend len = array_length(bag_keys(variables))\n| extend len1 = array_length(bag_keys(variables1))\n| where (TimeGenerated < TimeGenerated1 and len > len1) or (TimeGenerated1 > TimeGenerated and len1 < len)\n| project-away len, len1\n| extend VariablesRemoved = set_difference(bag_keys(variables), bag_keys(variables1)) \n| project-rename TimeCreated=TimeGenerated, TimeDeleted = TimeGenerated1, CreatingUser = ActorUPN, DeletingUser = ActorUPN1, CreatingIP = IpAddress, DeletingIP = IpAddress1, CreatingUA = UserAgent, DeletingUA = UserAgent1\n| project-reorder VariableGroupName, TimeCreated, TimeDeleted, VariablesRemoved, CreatingUser, CreatingIP, CreatingUA, DeletingUser, DeletingIP, DeletingUA\n| extend timestamp = TimeDeleted, AccountCustomEntity = DeletingUser, IPCustomEntity = DeletingIP\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Variables can be used at various stages of a pipeline to inject static variables. Depending on the build process these variables could be added by an attacker to get a build process to conduct an unwanted action such as communicating with a"
+          },
+          {
+            "name": "tactics",
+            "value": "DefenseEvasion"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1578"
+          }
+        ]
+      }
+    }
+  ]
+}

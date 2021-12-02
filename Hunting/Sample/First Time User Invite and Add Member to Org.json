@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/FirstTimeUserInviteandAddMembertoOrg')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "GitHub First Time Invite Member and Add Member to Repo",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet LearningPeriod = 7d;\nlet EndLearningTime = starttime - LearningPeriod;\nlet GitHubOrgMemberLogs = (GitHubAudit\n| where Action == \"org.invite_member\" or Action == \"org.update_member\" or Action == \"org.add_member\" or Action == \"repo.add_member\" or Action == \"team.add_member\");\nGitHubOrgMemberLogs\n| where TimeGenerated between (EndLearningTime..starttime)\n| distinct Actor\n| join kind=rightanti (\n  GitHubOrgMemberLogs\n  | where TimeGenerated between (starttime..endtime)\n  | distinct Actor\n) on Actor\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This hunting query identifies a user that add/invite a member to the organization for the first time. This technique can be leveraged by attackers to add stealth account access to the organization."
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1136"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/PrivilegedAccountsLockedOut')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Privileged Accounts Locked Out",
+        "category": "Hunting Queries",
+        "query": "let admins = (IdentityInfo\n| where AssignedRoles contains \"Admin\"\n| summarize by tolower(AccountUPN));\nSigninLogs\n| where ResultType == 50053\n| extend AccountUPN = tolower(UserPrincipalName)\n| extend AltUPN = tolower(AlternateSignInName)\n| where AccountUPN in (admins) or AltUPN in (admins)\n| extend AccountCustomEntity = AccountUPN, IPCustomEntity = IPAddress\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Identifies privileged accounts that have been locked out. Verify these lockout are due to legitimate user activity and not due to threat actors attempting to access the accounts.\nRef : https://docs.microsoft.comazure/active-directory/fundam"
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1078.004"
+          }
+        ]
+      }
+    }
+  ]
+}

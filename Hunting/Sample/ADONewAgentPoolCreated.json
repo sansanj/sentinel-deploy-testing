@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/ADONewAgentPoolCreated')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Azure DevOps - New Agent Pool Created",
+        "category": "Hunting Queries",
+        "query": "AzureDevOpsAuditing\n| where OperationName =~ \"Library.AgentPoolCreated\"\n| extend AgentPoolName = tostring(Data.AgentPoolName)\n| extend AgentPoolId = tostring(Data.AgentPoolId)\n| extend IsHosted = tostring(Data.IsHosted)\n| extend IsLegacy = tostring(Data.IsLegacy)\n| project-reorder TimeGenerated, ActorUPN, UserAgent, IpAddress, AuthenticationMechanism, OperationName, AgentPoolName, IsHosted, IsLegacy, Data\n| extend timestamp = TimeGenerated, AccountCustomEntity = ActorUPN, IPCustomEntity = IpAddress\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Agent Pools provide a valuable resource to build processes. Creating and using a compromised agent pool in a pipeline could allow an attacker to compromise a build process. Whilst the creation of an agent pool itself is not malicious it is "
+          },
+          {
+            "name": "tactics",
+            "value": "DefenseEvasion"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1578"
+          }
+        ]
+      }
+    }
+  ]
+}

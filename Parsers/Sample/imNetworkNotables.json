@@ -1,0 +1,25 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-08-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/imNetworkNotables')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "etag": "*",
+        "displayName": "Source Agnostic Network Notables parser",
+        "category": "Security",
+        "FunctionAlias": "imNetworkNotables",
+        "query": "let NetworkNotablesGeneric=(){\nunion isfuzzy=true\n  vimNetworkSessionEmpty\n};\nNetworkNotablesGeneric",
+        "version": 1
+      }
+    }
+  ]
+}

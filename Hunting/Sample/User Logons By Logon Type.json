@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/UserLogonsByLogonType')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Summary of user logons by logon type",
+        "category": "Hunting Queries",
+        "query": "\nSecurityEvent\n| where EventID in (4624, 4625)\n| where AccountType == 'User' \n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), Amount = count() by LogonTypeName\n| extend timestamp = StartTimeUtc\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Comparing succesful and nonsuccessful logon attempts can be used to identify attempts to move laterally within the \nenvironment with the intention of discovering credentials and sensitive data."
+          },
+          {
+            "name": "tactics",
+            "value": "CredentialAccess,LateralMovement"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1110"
+          }
+        ]
+      }
+    }
+  ]
+}

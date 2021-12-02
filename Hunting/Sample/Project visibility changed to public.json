@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/Projectvisibilitychangedtopublic')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Azure DevOps- Project visibility changed to public",
+        "category": "Hunting Queries",
+        "query": "AzureDevOpsAuditing\n| where Area == \"Project\"\n| where OperationName == \"Project.UpdateVisibilityCompleted\"\n| where Data.PreviousProjectVisibility == \"private\"\n| where Data.ProjectVisibility == \"public\"\n| extend timestamp = TimeGenerated, AccountCustomEntity = ActorUPN, IPCustomEntity = IpAddress\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This hunting query identifies Azure DevOps activities where organization project visibility changed to public project"
+          },
+          {
+            "name": "tactics",
+            "value": "Collection"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1213"
+          }
+        ]
+      }
+    }
+  ]
+}

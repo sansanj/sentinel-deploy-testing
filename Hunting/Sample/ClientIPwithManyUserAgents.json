@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/ClientIPwithManyUserAgents')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Same IP address with multiple csUserAgent",
+        "category": "Hunting Queries",
+        "query": "\nW3CIISLog\n| where scStatus !startswith \"20\" and scStatus !startswith \"30\" and cIP !startswith \"192.168.\" and cIP != sIP and cIP != \"::1\"\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), makeset(csUserAgent), ConnectionCount = count() \nby Computer, sSiteName, sIP, sPort, cIP, csMethod\n| extend csUserAgentPerIPCount = arraylength(set_csUserAgent)\n| where  csUserAgentPerIPCount between ( 2 .. 15 ) and ConnectionCount <=50\n| extend timestamp = StartTime, IPCustomEntity = cIP, HostCustomEntity = Computer\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This alerts when the same client IP (cIP) is connecting with more than 1 but less than 15 different useragent string (csUserAgent) in less than 1 hour.\nWe limit to 50 or less connections to avoid high traffic sites. This may indicate malici"
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1190"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/AzureStorageUploadLinkAccount')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "User Account Linked to Storage Account File Upload",
+        "category": "Hunting Queries",
+        "query": "\n//Period of time to look back in signin logs\nlet lookback = 1m;\nlet TargetFile = \"mimikatz.exe\"; //Example\nunion\nStorageFileLogs,\nStorageBlobLogs\n//Collect file uploads\n| where StatusText =~ \"Success\"\n| where OperationName =~ \"PutBlob\" or OperationName =~ \"PutRange\"\n| extend FileName = extract(@\"\\/([\\w\\-. ]+)\\?\", 1, Uri)\n//Uncomment below to enable file specific matching\n//| where FileName =~ TargetFile\n//Caller IP has the port appended, remove it\n| extend CallerIpAddress = tostring(split(CallerIpAddress, \":\", 0)[0])\n| extend FileUploadTime = TimeGenerated\n| extend WindowStart = FileUploadTime - lookback\n| join (\n    SigninLogs\n    | project AzureLoginTime=TimeGenerated, UserPrincipalName, IPAddress, LoginUserAgent=UserAgent\n) on $left.CallerIpAddress == $right.IPAddress\n//Look back in the signinlogs for the most recent login\n| where AzureLoginTime between (WindowStart .. FileUploadTime)\n| project AccountUsed=UserPrincipalName, AzureLoginTime, OperationName, FileUploadPath=Uri, CallerIpAddress, LoginUserAgent, UploadUserAgent=UserAgentHeader\n//Optional user agent check\n| where LoginUserAgent =~ UploadUserAgent\n//Pack and summarise the matching login events by the upload event\n| extend p = pack(\"AccountUsed\", AccountUsed, \"IPUsed\", CallerIpAddress, \"AzureLoginTime\", AzureLoginTime, \"UserAgent\", LoginUserAgent)\n| summarize LoginEvents=make_bag(p) by FileUploadPath, OperationName, UploadUserAgent\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This hunting query will try to identify the user account used to perform a file upload to blob storage.\nThis query can be used to match all file upload events, or filtering can be applied on filename to search for a specific upload."
+          },
+          {
+            "name": "tactics",
+            "value": "CredentialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1528"
+          }
+        ]
+      }
+    }
+  ]
+}

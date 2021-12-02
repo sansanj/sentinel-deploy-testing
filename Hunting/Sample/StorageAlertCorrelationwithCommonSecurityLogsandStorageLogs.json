@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/StorageAlertCorrelationwithCommonSecurityLogsandStorageLogs')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Storage Alert Correlation with CommonSecurityLogs and StorageLogs",
+        "category": "Hunting Queries",
+        "query": "SecurityAlert\n| where DisplayName has_any (\"Potential malware uploaded to a storage blob container\",\"Storage account identified as source for distribution of malware\")\n| extend Entities = parse_json(Entities)\n| mv-expand Entities\n| where Entities['Type'] =~ \"ip\"\n| extend AttackerIP = tostring(Entities['Address']), AttackerCountry = tostring(Entities['Location']['CountryName'])\n| join kind=inner (\nunion\nStorageFileLogs,\nStorageBlobLogs\n//File upload operations\n| where StatusText =~ \"Success\"\n| where OperationName =~ \"PutBlob\" or OperationName =~ \"PutRange\"\n| extend ClientIP = tostring(CallerIpAddress)\n) on $left.AttackerIP == $right.ClientIP\n| project AlertTimeGenerated = TimeGenerated, AttackerIP, AttackerCountry\n| join kind=inner (\nCommonSecurityLog\n| where DeviceVendor =~ \"Fortinet\"\n| where ApplicationProtocol has_any (\"SSL\",\"RDP\")\n| where LogSeverity has_any (\"2\",\"3\")\n| where isnotempty(SourceIP) and isnotempty(DestinationIP) and SourceIP != \"0.0.0.0\"\n| where DeviceAction !in (\"close\", \"client-rst\", \"server-rst\", \"deny\") and DestinationPort != 161\n| project DeviceProduct,LogSeverity,DestinationPort,DestinationIP,Message,SourceIP,SourcePort,Activity,SentBytes,ReceivedBytes)\n on $left.AttackerIP==$right.DestinationIP\n| summarize count() by AlertTimeGenerated,IpAddress=DestinationIP,SentBytes,ReceivedBytes,AttackerCountry\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This query combines different Storage alerts with CommonSecurityLogs and StorageLogs helping analysts  triage and investigate any \npossible Storage related attacks faster thus reducing Mean Time To Respond"
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess,LateralMovement"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1586,T1570"
+          }
+        ]
+      }
+    }
+  ]
+}

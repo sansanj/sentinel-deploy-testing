@@ -1,0 +1,43 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    },
+    "analytic-id": {
+      "type": "string",
+      "defaultValue": "268ccc64-75a0-4b1c-89ac-ee59cc28d528",
+      "minLength": 1,
+      "metadata": {
+        "description": "Unique id for the scheduled alert rule"
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/',parameters('analytic-id'))]",
+      "apiVersion": "2020-01-01",
+      "kind": "Scheduled",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "description": "This query monitors for users running Log Analytics queries that contain filters\nfor specific, defined VIP user accounts or the VIPUser watchlist template.\nUse this detection to alert for users specifically searching for activity of sensitive users.",
+        "displayName": "Users searching for VIP user activity",
+        "enabled": false,
+        "query": "// Replace these with the username or emails of your VIP users you wish to monitor for.\nlet vips = dynamic(['vip1@email.com','vip2@email.com']);\n// Add users who are allowed to conduct these searches - this could be specific SOC team members\nlet allowed_users = dynamic([]);\nLAQueryLogs\n| where QueryText has_any (vips) or QueryText has_any ('_GetWatchlist(\"VIPUsers\")', \"_GetWatchlist('VIPUsers')\")\n| project TimeGenerated, AADEmail, RequestClientApp, QueryText, ResponseRowCount, RequestTarget\n| extend timestamp = TimeGenerated, AccountCustomEntity = AADEmail\n",
+        "queryFrequency": "P1D",
+        "queryPeriod": "P1D",
+        "severity": "Low",
+        "suppressionDuration": "PT1H",
+        "suppressionEnabled": false,
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "tactics": [
+          "Collection",
+          "Exfiltration"
+        ]
+      }
+    }
+  ]
+}

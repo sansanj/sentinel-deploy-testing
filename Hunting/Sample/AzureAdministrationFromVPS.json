@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/AzureAdministrationFromVPS')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "AzureActivity Administration From VPS Providers",
+        "category": "Hunting Queries",
+        "query": "\nlet IP_Data = (externaldata(network:string)\n[@\"https://raw.githubusercontent.com/Azure/Azure-Sentinel/master/Sample%20Data/Feeds/VPS_Networks.csv\"] with (format=\"csv\"));\nAzureActivity\n| where CategoryValue =~ \"Administrative\"\n| evaluate ipv4_lookup(IP_Data, CallerIpAddress, network, return_unmatched = false)\n| summarize Operations = make_set(OperationNameValue), StartTime = min(TimeGenerated), EndTime = max(TimeGenerated) by CallerIpAddress, Caller\n| extend timestamp = StartTime, AccountCustomEntity = Caller, IPCustomEntity = CallerIpAddress\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Looks for Administrative actions in AzureActivity from known VPS provider network ranges.\nThis is not an exhaustive list of VPS provider ranges but covers some of the most prevalent providers observed."
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1078"
+          }
+        ]
+      }
+    }
+  ]
+}

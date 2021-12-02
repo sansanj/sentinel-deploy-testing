@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/MultiTeamBot')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Bots added to multiple teams",
+        "category": "Hunting Queries",
+        "query": "\n// Adjust these thresholds to suit your environment.\nlet threshold = 2;\nlet time_threshold = timespan(5m);\nOfficeActivity\n  | where OfficeWorkload =~ \"MicrosoftTeams\"\n  | where Operation =~ \"BotAddedToTeam\"\n  | summarize Start=max(TimeGenerated), End=min(TimeGenerated), Teams = makeset(TeamName)\n  | extend CountOfTeams = array_length(Teams)\n  | extend TimeDelta = End - Start \n  | where CountOfTeams > threshold\n  | where TimeDelta >= time_threshold\n  | project Start, End, Teams, CountOfTeams\n  | extend timestamp = Start\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This hunting query helps identify bots added to multiple Teams in a short space of time."
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence,Collection"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1176,T1119"
+          }
+        ]
+      }
+    }
+  ]
+}

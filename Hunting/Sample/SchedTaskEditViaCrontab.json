@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/SchedTaskEditViaCrontab')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Editing Linux scheduled tasks through Crontab",
+        "category": "Hunting Queries",
+        "query": "\n// Pull messages from Syslog-cron logs where the process is crontab and the severity level is \"info\". Extract the User and Action information from the SyslogMessage\nSyslog \n| where Facility =~ \"cron\" \n| where ProcessName =~ \"crontab\" \n| where SeverityLevel =~ \"info\" \n| project TimeGenerated, Computer, SeverityLevel, ProcessName, SyslogMessage\n| parse SyslogMessage with * \"(\" user  \") \" Action \" (\" *\n// Only look for messages that contain edit or replace\n| where Action contains \"EDIT\" or Action contains \"REPLACE\"\n//| summarize all the actions into a single set based on 10 minute time intervals\n| summarize ListOfActions = makeset(Action) by EventTime10MinInterval = bin(TimeGenerated, 10m), Computer, user   \n| order by Computer asc nulls last, EventTime10MinInterval asc\n| extend timestamp = EventTime10MinInterval, AccountCustomEntity = user, HostCustomEntity = Computer\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This query shows when users have edited or replaced the scheduled tasks using crontab. The events are bucketed into 10 minute intervals \nand all the actions that a particular used took are collected into the List of Actions. Default query i"
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence,Execution"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1059,T1053,T1037"
+          }
+        ]
+      }
+    }
+  ]
+}

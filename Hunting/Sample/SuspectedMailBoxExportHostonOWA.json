@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/SuspectedMailBoxExportHostonOWA')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Suspect Mailbox Export on IIS/OWA",
+        "category": "Hunting Queries",
+        "query": "\nlet excludeIps = dynamic([\"127.0.0.1\", \"::1\"]);\nlet scriptingExt = dynamic([\"aspx\", \"ashx\", \"asp\"]);\nW3CIISLog\n| where csUriStem contains \"/owa/\"\n//The actor pulls a file back but won't send it any URI params\n| where isempty(csUriQuery)\n| extend file_ext = tostring(split(csUriStem, \".\")[-1])\n//Giving your file a known scripting extension will throw an error\n//rather than just serving the file as it will try to interpret the script\n| where file_ext !in~ (scriptingExt)\n//The actor was seen using image files, but we go wider in case they change this behaviour\n//| where file_ext in~ (\"jpg\", \"jpeg\", \"png\", \"bmp\")\n| extend file_name = tostring(split(csUriStem, \"/\")[-1])\n| where file_name != \"\"\n| where cIP !in~ (excludeIps)\n| project file_ext, csUriStem, file_name, Computer, cIP, sIP, TenantId, TimeGenerated\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), dcount(cIP), AccessingIPs=make_set(cIP), AccessTimes=make_set(TimeGenerated), Access=count() by TenantId, file_name, Computer, csUriStem\n//Collection of the exfiltration will occur only once, lets check for 2 accesses in case they mess up\n//Tailor this for hunting\n| where Access <= 2 and dcount_cIP == 1\n| extend timestamp = StartTime\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "The hunting query looks for suspicious files accessed on a IIS server that might indicate exfiltration hosting.\nThis technique has been observed when exporting mailbox files from OWA servers.\nReference: https://www.volexity.com/blog/2020/12"
+          },
+          {
+            "name": "tactics",
+            "value": "Exfiltration"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1567"
+          }
+        ]
+      }
+    }
+  ]
+}

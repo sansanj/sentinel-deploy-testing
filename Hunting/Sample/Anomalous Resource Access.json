@@ -1,0 +1,34 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/AnomalousResourceAccess')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Anomalous Resource Access",
+        "category": "Hunting Queries",
+        "query": "\nBehaviorAnalytics\n| where ActivityType == \"LogOn\"\n| where ActionType == \"ResourceAccess\"\n| where ActivityInsights has \"True\"\n| project TimeGenerated, UserName, UserPrincipalName, UsersInsights, ActivityType, ActionType,ActivityInsights ,SourceIPAddress, SourceIPLocation, SourceDevice, DevicesInsights\n| extend timestamp = TimeGenerated\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Adversary may be trying to move through the environment. APT29 and APT32, for example, has used PtH & PtT techniques to lateral move around the network. The query below generates an output of all users performing an resource access (4624:3)"
+          },
+          {
+            "name": "tactics",
+            "value": "LateralMovement"
+          }
+        ]
+      }
+    }
+  ]
+}

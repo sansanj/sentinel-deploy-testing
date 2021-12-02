@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/OfficeMailForwarding_hunting')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Office Mail Forwarding - Hunting Version",
+        "category": "Hunting Queries",
+        "query": "\nOfficeActivity\n| where (Operation =~ \"Set-Mailbox\" and Parameters contains 'ForwardingSmtpAddress') \nor (Operation =~ 'New-InboxRule' and Parameters contains 'ForwardTo')\n| extend parsed=parse_json(Parameters)\n| extend fwdingDestination_initial = (iif(Operation=~\"Set-Mailbox\", tostring(parsed[1].Value), tostring(parsed[2].Value)))\n| where isnotempty(fwdingDestination_initial)\n| extend fwdingDestination = iff(fwdingDestination_initial has \"smtp\", (split(fwdingDestination_initial,\":\")[1]), fwdingDestination_initial )\n| parse fwdingDestination with * '@' ForwardedtoDomain \n| parse UserId with *'@' UserDomain\n| extend subDomain = ((split(strcat(tostring(split(UserDomain, '.')[-2]),'.',tostring(split(UserDomain, '.')[-1])), '.') [0]))\n| where ForwardedtoDomain !contains subDomain\n| extend Result = iff( ForwardedtoDomain != UserDomain ,\"Mailbox rule created to forward to External Domain\", \"Forward rule for Internal domain\")\n| extend ClientIPAddress = case( ClientIP has \".\", tostring(split(ClientIP,\":\")[0]), ClientIP has \"[\", tostring(trim_start(@'[[]',tostring(split(ClientIP,\"]\")[0]))), ClientIP )\n| extend Port = case(\nClientIP has \".\", (split(ClientIP,\":\")[1]),\nClientIP has \"[\", tostring(split(ClientIP,\"]:\")[1]),\nClientIP\n)\n| project TimeGenerated, UserId, UserDomain, subDomain, Operation, ForwardedtoDomain, ClientIPAddress, Result, Port, OriginatingServer, OfficeObjectId, fwdingDestination\n| extend timestamp = TimeGenerated, AccountCustomEntity = UserId, IPCustomEntity = ClientIPAddress, HostCustomEntity = OriginatingServer\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Adversaries often abuse email-forwarding rules to monitor activities of a victim, steal information and further gain intelligence on\nvictim or victim's organization.This query over Office Activity data highlights cases where user mail is be"
+          },
+          {
+            "name": "tactics",
+            "value": "Collection,Exfiltration"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1114,T1020"
+          }
+        ]
+      }
+    }
+  ]
+}

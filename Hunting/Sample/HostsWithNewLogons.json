@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/HostsWithNewLogons')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Hosts with new logons",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = totimespan((endtime-starttime)*7);\nlet LogonEvents=() {\nlet logonSuccess=SecurityEvent\n| where TimeGenerated between(ago(lookback)..endtime)\n| where EventID==4624\n| project TimeGenerated, ComputerName=Computer, AccountName=TargetUserName, AccountDomain=TargetDomainName, IpAddress, ActionType='Logon';\nlet logonFail=SecurityEvent\n| where TimeGenerated between(ago(lookback)..endtime)\n| where EventID==4625\n| project TimeGenerated, ComputerName=Computer, AccountName=TargetUserName, AccountDomain=TargetDomainName, IpAddress, ActionType='LogonFailure';\nlogonFail\n| union logonSuccess\n};\nLogonEvents\n| where TimeGenerated between(ago(lookback)..starttime)\n| where ActionType == 'Logon'\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), count() by ComputerName, AccountName\n| join kind=leftanti (\nLogonEvents\n| where TimeGenerated between(starttime..endtime)\n| where ActionType == 'Logon'\n| summarize count() by ComputerName, AccountName\n) on ComputerName, AccountName\n| summarize StartTimeUtc = min(StartTimeUtc), EndTimeUtc = max(EndTimeUtc), HostCount=dcount(ComputerName), HostSet=makeset(ComputerName, 10)  by AccountName, ComputerName\n| extend timestamp = StartTimeUtc, AccountCustomEntity = AccountName\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Shows new accounts that have logged onto a host for the first time - this may clearly be benign activity but an account\nlogging onto multiple hosts for the first time can also be used to look for evidence of that account being used to move\n"
+          },
+          {
+            "name": "tactics",
+            "value": "CredentialAccess,LateralMovement"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1110"
+          }
+        ]
+      }
+    }
+  ]
+}

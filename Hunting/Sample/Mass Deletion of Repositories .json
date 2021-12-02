@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/MassDeletionofRepositories')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "GitHub Mass Deletion of repos or projects",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet LearningPeriod = 7d;\nlet EndLearningTime = starttime - LearningPeriod;\nlet NumberOfStds = 3;\nlet MinThreshold = 10.0;\nlet GitHubRepositoryDestroyEvents = (GitHubAudit\n| where Action == \"repo.destroy\");\nGitHubRepositoryDestroyEvents\n| where TimeGenerated between (EndLearningTime .. starttime)\n| summarize count() by bin(TimeGenerated, BinTime)\n| summarize AvgInLearning = avg(count_), StdInLearning = stdev(count_)\n| extend LearningThreshold = max_of(AvgInLearning + StdInLearning * NumberOfStds, MinThreshold)\n| extend Dummy = 1\n| join kind=innerunique (\n  GitHubRepositoryDestroyEvents\n  | where TimeGenerated between (starttime..endtime)\n  | summarize CountInRunTime = count() by bin(TimeGenerated, BinTime)\n  | extend Dummy = 1\n) on Dummy\n| project-away Dummy\n| where CountInRunTime > LearningThreshold\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This hunting query identifies GitHub activites where there are a large number of deletions that may be a sign of compromise."
+          },
+          {
+            "name": "tactics",
+            "value": "Impact"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1485"
+          }
+        ]
+      }
+    }
+  ]
+}

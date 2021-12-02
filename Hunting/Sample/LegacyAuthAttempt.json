@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/LegacyAuthAttempt')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Login attempts using Legacy Auth",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = totimespan((endtime-starttime)*7);\nlet legacy_auth_protocols = dynamic([\"Authenticated SMTP\", \"Autodiscover\", \"Exchange ActiveSync\", \"Exchange Online PowerShell\", \"Exchange Web Services\", \"IMAP4\", \"MAPI over HTTP\", \"Outlook Anywhere\", \"Outlook Service\", \"POP3\", \"Reporting Web Services\", \"Other clients\"]);\nlet legacyAuthentications =\nSigninLogs\n| where TimeGenerated >= ago(lookback)\n// success logons only\n| where ResultType == 0\n| extend ClientAppUsed = iff(isempty(ClientAppUsed)==true,\"Unknown\" ,ClientAppUsed)\n| extend isLegacyAuth = iff(ClientAppUsed in (legacy_auth_protocols), \"Yes\", \"No\")\n| where isLegacyAuth==\"Yes\";\nlegacyAuthentications\n| where TimeGenerated >= starttime\n// Don't alert for accounts already seen using legacy auth in prior 7 days\n| join kind=leftanti (\n   legacyAuthentications\n   | where TimeGenerated between(ago(lookback)..starttime)\n) on UserPrincipalName, ClientAppUsed, AppDisplayName, IPAddress\n| extend OS = DeviceDetail.operatingSystem, Browser = DeviceDetail.browser\n| extend LocationString= strcat(tostring(LocationDetails[\"countryOrRegion\"]), \"/\",\ntostring(LocationDetails[\"state\"]), \"/\", tostring(LocationDetails[\"city\"]))\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), AttemptCount = count()\nby UserPrincipalName, ClientAppUsed, AppDisplayName, IPAddress, isLegacyAuth, tostring(OS), tostring(Browser), LocationString\n| sort by AttemptCount desc nulls last\n| extend timestamp = StartTime, AccountCustomEntity = UserPrincipalName, IPCustomEntity = IPAddress\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This query over Azure AD sign-in activity highlights use of legacy authentication protocol in the\nenvironment. Because conditional access policies are not evaluated when legacy authentication is used,\nlegacy authentication can be used to ci"
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess,Persistence"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1078,T1098"
+          }
+        ]
+      }
+    }
+  ]
+}

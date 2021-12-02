@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/ADONewReleaseApprover')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Azure DevOps - New Release Approver",
+        "category": "Hunting Queries",
+        "query": "let starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = 30d;\nAzureDevOpsAuditing\n| where TimeGenerated > ago(lookback) and TimeGenerated < starttime\n| where OperationName in (\"Release.ApprovalCompleted\", \"Release.ApprovalsCompleted\")\n| extend PipelineName = tostring(Data.PipelineName)\n| extend ApprovalType = tostring(Data.ApprovalType)\n| extend StageName = tostring(Data.StageName)\n| extend ReleaseName = tostring(Data.ReleaseName)\n| summarize by PipelineName, ActorUPN, ApprovalType\n| join kind=rightanti (\nAzureDevOpsAuditing\n| where TimeGenerated between(starttime..endtime)\n| where OperationName in (\"Release.ApprovalCompleted\", \"Release.ApprovalsCompleted\")\n| extend PipelineName = tostring(Data.PipelineName)\n| extend ApprovalType = tostring(Data.ApprovalType)\n| extend StageName = tostring(Data.StageName)\n| extend ReleaseName = tostring(Data.ReleaseName)) on ActorUPN\n| project-reorder TimeGenerated, PipelineName, ActorUPN, ApprovalType, StageName, ReleaseName, IpAddress, UserAgent, AuthenticationMechanism\n| extend timestamp = TimeGenerated, AccountCustomEntity = ActorUPN, IPCustomEntity = IpAddress\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Releases in Azure Pipelines often require a user authorization to perform the release. An attacker that has compromised a build may look to self-approve a release using a compromised account to avoid user focus on that release. This query l"
+          },
+          {
+            "name": "tactics",
+            "value": "DefenseEvasion"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1078"
+          }
+        ]
+      }
+    }
+  ]
+}

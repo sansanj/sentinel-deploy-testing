@@ -1,0 +1,34 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/imProcess_powershell_downloads')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "PowerShell downloads (Normalized Process Events)",
+        "category": "Hunting Queries",
+        "query": "imProcessCreate \n  | where Process has_any (\"powershell.exe\", \"powershell_ise.exe\") // perfromance pre-filtering\n  | extend FileName=tostring(split(TargetProcessFilePath, '\\\\')[-1])\n  | where FileName in~ (\"powershell.exe\", \"powershell_ise.exe\")\n  | where CommandLine has_any (\"Net.WebClient\", \"DownloadFile\", \"Invoke-WebRequest\", \"Invoke-Shellcode\", \"http:\")\n  | project TimeGenerated, Dvc, User, InitiatingProcessFileName, FileName, CommandLine, EventVendor, EventProduct\n  | top 100 by TimeGenerated\n  | extend timestamp = TimeGenerated, HostCustomEntity = Dvc, AccountCustomEntity = User\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Finds PowerShell execution events that could involve a download"
+          },
+          {
+            "name": "tactics",
+            "value": "Execution,CommandAndControl"
+          }
+        ]
+      }
+    }
+  ]
+}

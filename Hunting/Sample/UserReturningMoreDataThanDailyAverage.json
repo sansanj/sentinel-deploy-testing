@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/UserReturningMoreDataThanDailyAverage')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "User returning more data than daily average",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = totimespan((endtime-starttime)*7);\nlet threshold = 10;\nlet baseline = 10000;\nlet diff = 5;\nlet anomolous_users = (\nLAQueryLogs\n| where TimeGenerated between(startofday(ago(lookback))..starttime)\n| summarize score=sum(ResponseRowCount) by AADEmail\n| join kind = fullouter (LAQueryLogs\n| where TimeGenerated between(starttime..endtime)\n| summarize score_now=sum(ResponseRowCount) by AADEmail)\non AADEmail\n| extend hist_score = iif((score/29)*threshold > baseline, (score/29)*threshold, baseline)\n| where isnotempty(score)\n| where score_now > hist_score*diff\n| project AADEmail);\nLAQueryLogs\n| where TimeGenerated between(starttime..endtime)\n| where AADEmail in(anomolous_users)\n| extend timestamp = TimeGenerated, AccountCustomEntity = AADEmail\n// Comment out the line below to see the queries run by users.\n| summarize total_rows = sum(ResponseRowCount), NoQueries = count(), AvgQuerySize = sum(ResponseRowCount)/count() by AADEmail\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This hunting query looks for users whose total returned data that is significantly above their average."
+          },
+          {
+            "name": "tactics",
+            "value": "Exfiltration"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1030"
+          }
+        ]
+      }
+    }
+  ]
+}

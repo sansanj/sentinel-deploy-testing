@@ -1,0 +1,42 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    },
+    "analytic-id": {
+      "type": "string",
+      "defaultValue": "eace0d67-a6e1-42d6-96db-096f089779d7",
+      "minLength": 1,
+      "metadata": {
+        "description": "Unique id for the scheduled alert rule"
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/',parameters('analytic-id'))]",
+      "apiVersion": "2020-01-01",
+      "kind": "Scheduled",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "description": "This query searches for successful user logins to the Okta Console from different countries within 3 hours",
+        "displayName": "User Login from Different Countries within 3 hours",
+        "enabled": false,
+        "query": "\nlet timeframe = ago(3h);\nlet threshold = 2;\nOkta_CL\n| where column_ifexists('published_t', now()) >= timeframe\n| where eventType_s =~ \"user.session.start\"\n| where outcome_result_s =~ \"SUCCESS\"\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), NumOfCountries = dcount(client_geographicalContext_country_s) by actor_alternateId_s\n| where NumOfCountries >= threshold\n| extend timestamp = StartTime, AccountCustomEntity = actor_alternateId_s\n",
+        "queryFrequency": "PT3H",
+        "queryPeriod": "PT3H",
+        "severity": "High",
+        "suppressionDuration": "PT1H",
+        "suppressionEnabled": false,
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0,
+        "tactics": [
+          "InitialAccess"
+        ]
+      }
+    }
+  ]
+}

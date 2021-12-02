@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/ADOReleasePipelineCreated')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Azure DevOps - New Release Pipeline Created",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = 30d;\n// Set the period for detections\n// Get a list of previous Release Pipeline creators to exclude\nlet releaseusers = AzureDevOpsAuditing\n| where TimeGenerated between(ago(lookback)..starttime)\n| where OperationName =~ \"Release.ReleasePipelineCreated\"\n// We want to look for users performing actions in specific organizations so we creat this userscope object to match on\n| extend UserScope = strcat(ActorUPN, \"-\", ProjectName)\n| summarize by UserScope;\n// Get Release Pipeline creations by new users\nAzureDevOpsAuditing\n| where TimeGenerated between(starttime..endtime)\n| where OperationName =~ \"Release.ReleasePipelineCreated\"\n| extend UserScope = strcat(ActorUPN, \"-\", ProjectName)\n| where UserScope !in (releaseusers)\n| extend ActorUPN = tolower(ActorUPN)\n| project-away Id, ActivityId, ActorCUID, ScopeId, ProjectId, TenantId, SourceSystem, UserScope\n// See if any of these users have Azure AD alerts associated with them in the same timeframe\n| join kind = leftouter (\nSecurityAlert\n| where TimeGenerated between(starttime..endtime)\n| where ProviderName == \"IPC\"\n| extend AadUserId = tostring(parse_json(Entities)[0].AadUserId)\n| summarize Alerts=count() by AadUserId) on $left.ActorUserId == $right.AadUserId\n| project-reorder TimeGenerated, ProjectName, Details, ActorUPN, IpAddress, UserAgent, Alerts\n| extend timestamp = TimeGenerated, AccountCustomEntity = ActorUPN, IPCustomEntity = IpAddress\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "An attacker could look to create a new poisoned pipeline in Azure DevOps and attack a build process to it. This hunting query looks for new pipelines being created in projects where the creating user has not been seen creating a pipeline be"
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence,Execution,PrivilegeEscalation"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1053"
+          }
+        ]
+      }
+    }
+  ]
+}

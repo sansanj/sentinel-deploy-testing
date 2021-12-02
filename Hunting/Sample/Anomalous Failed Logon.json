@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/AnomalousFailedLogon')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Anomalous Failed Logon",
+        "category": "Hunting Queries",
+        "query": "\nBehaviorAnalytics\n| where ActivityType == \"LogOn\"\n| where UsersInsights.BlastRadius == \"High\"\n| join (\nSigninLogs  | where Status.errorCode == 50126\n) on $left.SourceRecordId == $right._ItemId\n| extend UserPrincipalName = iff(UserPrincipalName contains \"#EXT#\",replace(\"_\",\"@\",tostring(split(UserPrincipalName, \"#\")[0])),UserPrincipalName),\nUserName = iff(UserName contains \"#EXT#\",replace(\"_\",\"@\",tostring(split(UserPrincipalName, \"#\")[0])),UserName)\n| project TimeGenerated, UserName, UserPrincipalName, UsersInsights, ActivityType, ActionType,[\"Evidence\"]=ActivityInsights, ResourceDisplayName,AppDisplayName ,SourceIPAddress, SourceIPLocation, SourceDevice, DevicesInsights\n| extend timestamp = TimeGenerated\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Adversaries with no prior knowledge of legitimate credentials within the system or environment may guess passwords to attempt access to accounts. Emotet, for example, has been observed using a hard coded list of passwords to brute force use"
+          },
+          {
+            "name": "tactics",
+            "value": "CredentialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1110.001"
+          }
+        ]
+      }
+    }
+  ]
+}
