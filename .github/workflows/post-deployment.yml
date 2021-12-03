@@ -24,33 +24,36 @@ jobs:
     runs-on: windows-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+
       - name: Extract Variables
         id: extract-variables
         shell: pwsh
         run: |
-          $workflowName="${{github.event.workflow.path}}"
-          $scId=$workflowName.Substring(34,36) -replace '-',''
+          $workflowPath="${{github.event.workflow.path}}"
+          $scId=$workflowPath.Substring(34,36) -replace '-',''
+          $workflow = Get-Content -Path $workflowPath | Out-String | ConvertFrom-YAML
           echo "::set-output name=secret_name::AZURE_SENTINEL_CREDENTIALS_$scId"
           echo "::set-output name=source_control_id::$scId"
+          echo "::set-output name=resource_group_name::${workflow.jobs.deploy-content.env.resourceGroupName}"
+          echo "::set-output name=workspace_name::${workflow.jobs.deploy-content.env.workspaceName}"
 
-#       - name: set creds as env variable 
-#         run: |
-#           echo "::set-env name=CREDS::${}"
-#         env: 
-#           CREDS: ${{ secrets[steps.extractSecretName.outputs.name] }}
-    
     outputs:
       creds_name: ${{ steps.extract-variables.outputs.secret_name }}
       source_control_id: ${{ steps.extract-variables.outputs.source_control_id }}
-
+      resource_group_name: ${{ steps.extract-variables.outputs.resource_group_name }}
+      workspace_name: ${{ steps.extract-variables.outputs.workspace_name }}
+      
   on-success:
    needs: 
      - on-success-prepare
    runs-on: windows-latest
    env:
-     CREDS_SECRET_NAME: ${{ needs.on-success-prepare.outputs.creds_name }}
      SOURCE_CONTROL_ID: ${{ needs.on-success-prepare.outputs.source_control_id }}
      CREDS: ${{ secrets[needs.on-success-prepare.outputs.creds_name] }}
+     RESOURCE_GROUP_NAME: ${{ needs.on-success-prepare.outputs.resource_group_name }}
+     WORKSPACE_NAME: ${{ needs.on-success-prepare.outputs.workspace_name }}
    steps:
      - name: Login to Azure
        id: login
