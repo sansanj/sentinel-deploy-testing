@@ -28,7 +28,7 @@ jobs:
         id: extractSecretName
         shell: pwsh
         run: |
-          $workflowName=${{github.event.workflow.path}}
+          $workflowName="${{github.event.workflow.path}}"
           $scId=$workflowName.Substring(34,36)
           echo ::set-output name=name::"AZURE_SENTINEL_CREDENTIALS_$scId"
 
