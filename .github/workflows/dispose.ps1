@@ -5,8 +5,8 @@ $Creds = $Env:CREDS | ConvertFrom-Json
 $endpoint = "management.azure.com"
 $subscriptionId = $Creds.subscriptionId
 $tenantId = $Creds.tenantId
-$resourceGroupName = "test-rg" # $Env:RESOURCE_GROUP_NAME
-$workspaceName = "test-rws" # $Env:WORKSPACE_NAME
+$resourceGroupName = $Env:RESOURCE_GROUP_NAME
+$workspaceName = $Env:WORKSPACE_NAME
 Write-Host $subscriptionId
 Write-Host $tenantId
 
