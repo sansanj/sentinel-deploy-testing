@@ -24,13 +24,14 @@ jobs:
     runs-on: windows-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
-      - name: Extract Secret Name
-        id: extract-secret-name
+      - name: Extract Variables
+        id: extract-variables
         shell: pwsh
         run: |
           $workflowName="${{github.event.workflow.path}}"
           $scId=$workflowName.Substring(34,36) -replace '-',''
           echo "::set-output name=secret_name::AZURE_SENTINEL_CREDENTIALS_$scId"
+          echo "::set-output name=source_control_id::$scId"
 
 #       - name: set creds as env variable 
 #         run: |
@@ -39,7 +40,8 @@ jobs:
 #           CREDS: ${{ secrets[steps.extractSecretName.outputs.name] }}
     
     outputs:
-      creds_name: ${{ steps.extract-secret-name.outputs.secret_name }}
+      creds_name: ${{ steps.extract-variables.outputs.secret_name }}
+      source_control_id: ${{ steps.extract-variables.outputs.source_control_id }}
 
   on-success:
    needs: 
@@ -47,6 +49,8 @@ jobs:
    runs-on: windows-latest
    env:
      CREDS_SECRET_NAME: ${{ needs.on-success-prepare.outputs.creds_name }}
+     SOURCE_CONTROL_ID: ${{ needs.on-success-prepare.outputs.source_control_id }}
+     CREDS: ${{ secrets[env.CREDS_SECRET_NAME] }}
    steps:
      - name: Login to Azure
        id: login
