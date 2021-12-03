@@ -14,9 +14,39 @@ jobs:
     steps:
       - name: Send Teams Message if failed
         uses: jdcargile/ms-teams-notification@v1.3
-        if: ${{ always() && github.event.workflow_run.conclusion == 'failure' }}
         with:
           github-token: ${{ github.token }}
           ms-teams-webhook-uri: ${{ secrets.MS_TEAMS_WEBHOOK_URI }}
           notification-summary: Workflow Run Failed On GitHub - ${{ github.event.workflow_run.html_url }}
           notification-color: dc3545 
+  
+  on-success:
+    runs-on: windows-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Extract Source Control Id
+        id: extractSourceControlId
+        shell: pwsh
+        run: |
+          $workflowName=${{github.event.workflow.path}}
+          $scId=$workflowName.Substring(34,36)
+          echo ::set-output name=name::"$scId"
+
+      - name: set creds as env variable 
+        run: |
+          echo "creds=${{ secrets.AZURE_SENTINEL_CREDENTIALS_${steps.extractSourceControlId.outputs.id} }}" >> $GITHUB_ENV
+      
+      - name: Login to Azure
+        id: login
+        uses: azure/login@v1
+        if: ${{ env.cloudEnv == 'AzureCloud' }}
+        with:
+          creds: ${{ env.creds }}
+          enable-AzPSSession: true
+      
+      - name: Dispose connection
+        uses: azure/powershell@v1
+        with:
+          azPSVersion: 'latest'
+          inlineScript: |
+            ${{ github.workspace }}/.github/workflows/dispose.ps1
