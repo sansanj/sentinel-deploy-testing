@@ -24,17 +24,17 @@ jobs:
     runs-on: windows-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
-      - name: Extract Source Control Id
-        id: extractSourceControlId
+      - name: Extract Secret Name
+        id: extractSecretName
         shell: pwsh
         run: |
           $workflowName=${{github.event.workflow.path}}
           $scId=$workflowName.Substring(34,36)
-          echo ::set-output name=name::"$scId"
+          echo ::set-output name=name::"AZURE_SENTINEL_CREDENTIALS_$scId"
 
       - name: set creds as env variable 
         run: |
-          echo "creds=${{ secrets.AZURE_SENTINEL_CREDENTIALS_${steps.extractSourceControlId.outputs.id} }}" >> $GITHUB_ENV
+          echo "creds=${{ secrets[steps.extractSecretName.outputs.name] }}" >> $GITHUB_ENV
       
       - name: Login to Azure
         id: login
