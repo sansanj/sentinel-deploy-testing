@@ -1,4 +1,4 @@
-name: Send Status if Workflow Failed 
+name: Post Deployment Workflow
 
 on:
   workflow_run:
