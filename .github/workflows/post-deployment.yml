@@ -57,7 +57,7 @@ jobs:
        uses: azure/login@v1
 #        if: ${{ env.cloudEnv == 'AzureCloud' }} TODO: extract env from workflow
        with:
-         creds: ${{ CREDS }}
+         creds: ${{ env.CREDS }}
          enable-AzPSSession: true
      
      - name: Checkout
