@@ -14,8 +14,9 @@ on:
     branches: [ main ]
     paths:
     - '**'
-    - '!.github/workflows/**'  # this filter prevents other workflow changes from triggering this workflow test
+    - '!.github/workflows/**'  # this filter prevents other workflow changes from triggering this workflow
     - '.github/workflows/sentinel-deploy-f3839cf4-5534-43f4-806a-727c84b6f42b.yml'
+    - '.github/workflows/post-deployment.yml'
 
 jobs:
     test:
