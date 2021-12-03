@@ -39,11 +39,14 @@ jobs:
       - name: Login to Azure
         id: login
         uses: azure/login@v1
-        if: ${{ env.cloudEnv == 'AzureCloud' }}
+#         if: ${{ env.cloudEnv == 'AzureCloud' }} TODO: extract env from workflow
         with:
           creds: ${{ env.creds }}
           enable-AzPSSession: true
-      
+     
+      - name: Checkout
+        uses: actions/checkout@v1
+
       - name: Dispose connection
         uses: azure/powershell@v1
         with:
