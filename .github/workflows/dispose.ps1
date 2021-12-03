@@ -10,5 +10,5 @@ $workspaceName = $Env:WORKSPACE_NAME
 Write-Host $subscriptionId
 Write-Host $tenantId
 
-$url = "https://$endpoint/subscriptions/$subscriptionId/resourceGroups/$resourceGroupName/providers/Microsoft.OperationalInsights/workspaces/$workspaceName/providers/Microsoft.SecurityInsights/sourceControls/$sourceControlId?api-version=2021-03-01-preview"
+$url = "https://$endpoint/subscriptions/$subscriptionId/resourceGroups/$resourceGroupName/providers/Microsoft.OperationalInsights/workspaces/$workspaceName/providers/Microsoft.SecurityInsights/sourceControls/${sourceControlId}?api-version=2021-03-01-preview"
 Write-Host $url
