@@ -40,8 +40,8 @@ jobs:
           
           echo "::set-output name=secret_name::AZURE_SENTINEL_CREDENTIALS_$scId"
           echo "::set-output name=source_control_id::$scId"
-          echo "::set-output name=resource_group_name::${workflow.jobs.deploy-content.env.resourceGroupName}"
-          echo "::set-output name=workspace_name::${workflow.jobs.deploy-content.env.workspaceName}"
+          echo "::set-output name=resource_group_name::$resourceGroupName"
+          echo "::set-output name=workspace_name::$workspaceName"
 
 
     outputs:
