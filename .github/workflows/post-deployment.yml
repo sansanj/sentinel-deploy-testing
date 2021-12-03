@@ -50,7 +50,7 @@ jobs:
    env:
      CREDS_SECRET_NAME: ${{ needs.on-success-prepare.outputs.creds_name }}
      SOURCE_CONTROL_ID: ${{ needs.on-success-prepare.outputs.source_control_id }}
-     CREDS: ${{ secrets[env.CREDS_SECRET_NAME] }}
+     CREDS: ${{ secrets[needs.on-success-prepare.outputs.creds_name] }}
    steps:
      - name: Login to Azure
        id: login
