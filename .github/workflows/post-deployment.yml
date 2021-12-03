@@ -34,9 +34,9 @@ jobs:
           $workflowPath="${{github.event.workflow.path}}"
           $scId=$workflowPath.Substring(34,36) -replace '-',''          
           $workspaceNameMatchInfo = Select-String -Path $workflowPath -Pattern "workspaceName: '(.*)'"
-          $workspaceName = $workspaceNameMatchInfo.[0].Matches.Groups[1].Value
+          $workspaceName = $workspaceNameMatchInfo[0].Matches.Groups[1].Value
           $resourceGroupNameMatchInfo = Select-String -Path $workflowPath -Pattern "resourceGroupName: '(.*)'"
-          $resourceGroupName = $resourceGroupNameMatchInfo.[0].Matches.Groups[1].Value
+          $resourceGroupName = $resourceGroupNameMatchInfo[0].Matches.Groups[1].Value
           
           echo "::set-output name=secret_name::AZURE_SENTINEL_CREDENTIALS_$scId"
           echo "::set-output name=source_control_id::$scId"
