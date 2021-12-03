@@ -19,7 +19,7 @@ on:
 
 jobs:
     test:
-      runs-on: wondows-latest
+      runs-on: windows-latest
       steps:
       - name: Test
         shell: pwsh
