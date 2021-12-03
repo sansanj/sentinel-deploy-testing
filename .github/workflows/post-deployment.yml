@@ -33,15 +33,15 @@ jobs:
           echo ::set-output name=name::"AZURE_SENTINEL_CREDENTIALS_$scId"
 
       - name: set creds as env variable 
-        run: |
-          echo "creds=${{ secrets[steps.extractSecretName.outputs.name] }}" >> $GITHUB_ENV
+        env: 
+          CREDS: ${{ secrets[steps.extractSecretName.outputs.name] }}
       
       - name: Login to Azure
         id: login
         uses: azure/login@v1
 #         if: ${{ env.cloudEnv == 'AzureCloud' }} TODO: extract env from workflow
         with:
-          creds: ${{ env.creds }}
+          creds: ${{ env.CREDS }}
           enable-AzPSSession: true
      
       - name: Checkout
