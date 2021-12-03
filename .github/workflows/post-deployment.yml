@@ -50,7 +50,6 @@ jobs:
    env:
      CREDS_SECRET_NAME: ${{ needs.on-success-prepare.outputs.creds_name }}
      SOURCE_CONTROL_ID: ${{ needs.on-success-prepare.outputs.source_control_id }}
-     CREDS: ${{ secrets[needs.on-success-prepare.outputs.creds_name] }}
    steps:
      - name: Login to Azure
        id: login
@@ -60,6 +59,10 @@ jobs:
          creds: ${{ secrets[env.CREDS_SECRET_NAME] }}
          enable-AzPSSession: true
 
+     - name: Checkout
+       run: |
+         echo "CREDS=${{ secrets[env.CREDS_SECRET_NAME] }}" >> $GITHUB_ENV
+     
      - name: Checkout
        uses: actions/checkout@v1
 
