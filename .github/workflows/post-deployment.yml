@@ -32,12 +32,17 @@ jobs:
         shell: pwsh
         run: |
           $workflowPath="${{github.event.workflow.path}}"
-          $scId=$workflowPath.Substring(34,36) -replace '-',''
-          $workflow = Get-Content -Path $workflowPath | Out-String | ConvertFrom-YAML
+          $scId=$workflowPath.Substring(34,36) -replace '-',''          
+          $workspaceNameMatchInfo = Select-String -Path $workflowPath -Pattern "workspaceName: '(.*)'"
+          $workspaceName = workspaceNameMatchInfo.[0].Matches.Groups[1].Value
+          $resourceGroupNameMatchInfo = Select-String -Path $workflowPath -Pattern "resourceGroupName: '(.*)'"
+          $resourceGroupName = resourceGroupNameMatchInfo.[0].Matches.Groups[1].Value
+          
           echo "::set-output name=secret_name::AZURE_SENTINEL_CREDENTIALS_$scId"
           echo "::set-output name=source_control_id::$scId"
           echo "::set-output name=resource_group_name::${workflow.jobs.deploy-content.env.resourceGroupName}"
           echo "::set-output name=workspace_name::${workflow.jobs.deploy-content.env.workspaceName}"
+
 
     outputs:
       creds_name: ${{ steps.extract-variables.outputs.secret_name }}
