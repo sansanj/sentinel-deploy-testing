@@ -30,7 +30,7 @@ jobs:
         run: |
           $workflowName="${{github.event.workflow.path}}"
           $scId=$workflowName.Substring(34,36)
-          echo ::set-output name=name::"AZURE_SENTINEL_CREDENTIALS_$scId"
+          echo "::set-output name=secret_name::AZURE_SENTINEL_CREDENTIALS_$scId"
 
 #       - name: set creds as env variable 
 #         run: |
@@ -39,7 +39,7 @@ jobs:
 #           CREDS: ${{ secrets[steps.extractSecretName.outputs.name] }}
     
     outputs:
-      creds_name: ${{ steps.extract-secret-name.outputs.name }}
+      creds_name: ${{ steps.extract-secret-name.outputs.secret_name }}
 
   on-success:
    needs: 
