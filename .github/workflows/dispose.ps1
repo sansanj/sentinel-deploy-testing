@@ -14,5 +14,5 @@ $Headers = @{
     'Authorization' = $token
     "Content-Type"  = 'application/json'
 }
-$response = Invoke-WebRequest -Headers $Headers -Uri $url -Headers $headers -Method 'DELETE'
+$response = Invoke-WebRequest -Headers $Headers -Uri $url -Method 'DELETE'
 Write-Host $ProfileResponse
