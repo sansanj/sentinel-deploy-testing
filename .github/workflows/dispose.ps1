@@ -15,4 +15,4 @@ $Headers = @{
     "Content-Type"  = 'application/json'
 }
 $response = Invoke-WebRequest -Headers $Headers -Uri $url -Method 'DELETE'
-Write-Host $ProfileResponse
+Write-Host $response 
