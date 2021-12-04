@@ -7,11 +7,9 @@ $subscriptionId = $Creds.subscriptionId
 $tenantId = $Creds.tenantId
 $resourceGroupName = $Env:RESOURCE_GROUP_NAME
 $workspaceName = $Env:WORKSPACE_NAME
-Write-Host $subscriptionId
-Write-Host $tenantId
 
 $url = "https://$endpoint/subscriptions/$subscriptionId/resourceGroups/$resourceGroupName/providers/Microsoft.OperationalInsights/workspaces/$workspaceName/providers/Microsoft.SecurityInsights/sourceControls/${sourceControlId}?api-version=2021-03-01-preview"
 $tokenResult = Get-AzAccessToken
-Write-Host $tokenResult.UserId
+$token = ConvertTo-SecureString -String ${tokenResult.Token} -AsPlainText -Force
 $response = Invoke-WebRequest $url -Authentication Bearer -Token $tokenResult.Token -Method 'DELETE'
 Write-Host $ProfileResponse
