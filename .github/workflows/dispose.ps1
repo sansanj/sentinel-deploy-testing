@@ -12,6 +12,6 @@ Write-Host $tenantId
 
 $url = "https://$endpoint/subscriptions/$subscriptionId/resourceGroups/$resourceGroupName/providers/Microsoft.OperationalInsights/workspaces/$workspaceName/providers/Microsoft.SecurityInsights/sourceControls/${sourceControlId}?api-version=2021-03-01-preview"
 $tokenResult = Get-AzAccessToken
-$headers = @{"Authorization"="Bearer ${tokenResult.Token}"}
-$response = Invoke-WebRequest $url -Headers $headers -Method 'DELETE'
+Write-Host $tokenResult.UserId
+$response = Invoke-WebRequest $url -Authentication Bearer -Token $tokenResult.Token -Method 'DELETE'
 Write-Host $ProfileResponse
