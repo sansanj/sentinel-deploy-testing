@@ -9,7 +9,10 @@ $resourceGroupName = $Env:RESOURCE_GROUP_NAME
 $workspaceName = $Env:WORKSPACE_NAME
 
 $url = "https://$endpoint/subscriptions/$subscriptionId/resourceGroups/$resourceGroupName/providers/Microsoft.OperationalInsights/workspaces/$workspaceName/providers/Microsoft.SecurityInsights/sourceControls/${sourceControlId}?api-version=2021-03-01-preview"
-$tokenResult = Get-AzAccessToken
-$token = ConvertTo-SecureString -String ${tokenResult.Token} -AsPlainText -Force
-$response = Invoke-WebRequest $url -Authentication Bearer -Token $tokenResult.Token -Method 'DELETE'
+$token = "Bearer {0}" -f (Get-AzAccessToken -Resource "https://management.azure.com").Token
+$Headers = @{
+    'Authorization' = $token
+    "Content-Type"  = 'application/json'
+}
+$response = Invoke-WebRequest -Headers $Headers -Uri $url -Headers $headers -Method 'DELETE'
 Write-Host $ProfileResponse
