@@ -12,7 +12,8 @@ $url = "https://$endpoint/subscriptions/$subscriptionId/resourceGroups/$resource
 $token = "Bearer {0}" -f (Get-AzAccessToken -Resource "https://management.azure.com").Token
 $Headers = @{
     'Authorization' = $token
-    "Content-Type"  = 'application/json'
+    'Content-Type'  = 'application/json'
+    'x-ms-repo-oauth-client-id' = 'Iv1.e1ecce06c5572019'
 }
 $response = Invoke-WebRequest -Headers $Headers -Uri $url -Method 'DELETE'
 Write-Host $response 
