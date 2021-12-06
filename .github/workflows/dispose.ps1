@@ -13,7 +13,7 @@ $token = "Bearer {0}" -f (Get-AzAccessToken -Resource "https://management.azure.
 $Headers = @{
     'Authorization' = $token
     'Content-Type'  = 'application/json'
-    'x-ms-repo-oauth-client-id' = 'Iv1.e1ecce06c5572019'
+##    'x-ms-repo-oauth-client-id' = 'Iv1.e1ecce06c5572019'  ## for canary
 }
 $response = Invoke-WebRequest -Headers $Headers -Uri $url -Method 'DELETE'
 Write-Host $response 
