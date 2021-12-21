@@ -62,7 +62,7 @@ if ($CloudEnv -ne 'AzureCloud')
 
 $endpoint = $Creds.resourceManagerEndpointUrl
 $url = "${endpoint}subscriptions/$subscriptionId/resourceGroups/$resourceGroupName/providers/Microsoft.OperationalInsights/workspaces/$workspaceName/providers/Microsoft.SecurityInsights/sourceControls/${sourceControlId}?api-version=2021-03-01-preview"
-$token = "Bearer {0}" -f (Get-AzAccessToken -Resource $endpoint).Token
+$token = "Bearer {0}" -f (Get-AzAccessToken -Resource "https://management.azure.com").Token
 $Headers = @{
     'Authorization' = $token
     'Content-Type'  = 'application/json'
