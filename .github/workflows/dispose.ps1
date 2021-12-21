@@ -7,7 +7,7 @@ $subscriptionId = $Creds.subscriptionId
 $tenantId = $Creds.tenantId
 $resourceGroupName = $Env:RESOURCE_GROUP_NAME
 $workspaceName = $Env:WORKSPACE_NAME
-$envName = $Env:ENV_NAME
+$CloudEnv = $Env:ENV_NAME
 
 function AttemptAzLogin($psCredential, $tenantId, $cloudEnv) {
     $maxLoginRetries = 3
