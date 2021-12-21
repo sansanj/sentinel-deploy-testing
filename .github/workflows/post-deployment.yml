@@ -40,10 +40,10 @@ jobs:
           $cloudEnvMatchInfo = Select-String -Path $workflowPath -Pattern "cloudEnv: '(.*)'"
           $cloudEnv = $cloudEnvMatchInfo[0].Matches.Groups[1].Value
           
+          echo "::set-output name=cloud_env::$cloudEnv"
           echo "::set-output name=source_control_id::$scId"
           echo "::set-output name=resource_group_name::$resourceGroupName"
           echo "::set-output name=workspace_name::$workspaceName"
-          echo "::set-output name=cloud_env::$cloudEnv"
 
 
     outputs:
@@ -66,7 +66,7 @@ jobs:
      - name: Login to Azure
        id: login
        uses: azure/login@v1
-       if: ${{ env.cloudEnv == 'AzureCloud' }}
+       if: ${{ env.CLOUD_ENV == 'AzureCloud' }}
        with:
          creds: ${{ secrets.SOURCE_CONTROL_DISPOSAL }}
          enable-AzPSSession: true
