@@ -37,18 +37,20 @@ jobs:
           $workspaceName = $workspaceNameMatchInfo[0].Matches.Groups[1].Value
           $resourceGroupNameMatchInfo = Select-String -Path $workflowPath -Pattern "resourceGroupName: '(.*)'"
           $resourceGroupName = $resourceGroupNameMatchInfo[0].Matches.Groups[1].Value
+          $envNameMatchInfo = Select-String -Path $workflowPath -Pattern "cloudEnv: '(.*)'"
+          $envName = $envNameMatchInfo[0].Matches.Groups[1].Value
           
-          echo "::set-output name=secret_name::AZURE_SENTINEL_CREDENTIALS_$scId"
           echo "::set-output name=source_control_id::$scId"
           echo "::set-output name=resource_group_name::$resourceGroupName"
           echo "::set-output name=workspace_name::$workspaceName"
+          echo "::set-output name=env_name::$envName"
 
 
     outputs:
-      creds_name: ${{ steps.extract-variables.outputs.secret_name }}
       source_control_id: ${{ steps.extract-variables.outputs.source_control_id }}
       resource_group_name: ${{ steps.extract-variables.outputs.resource_group_name }}
       workspace_name: ${{ steps.extract-variables.outputs.workspace_name }}
+      env_name: ${{ steps.extract-variable.outputs.env_name }}
       
   on-success:
    needs: 
@@ -56,16 +58,16 @@ jobs:
    runs-on: windows-latest
    env:
      SOURCE_CONTROL_ID: ${{ needs.on-success-prepare.outputs.source_control_id }}
-     CREDS: ${{ secrets[needs.on-success-prepare.outputs.creds_name] }}
+     CREDS: ${{ secrets['SOURCE_CONTROL_DISPOSAL_DF'] }}
      RESOURCE_GROUP_NAME: ${{ needs.on-success-prepare.outputs.resource_group_name }}
      WORKSPACE_NAME: ${{ needs.on-success-prepare.outputs.workspace_name }}
    steps:
      - name: Login to Azure
        id: login
        uses: azure/login@v1
-#        if: ${{ env.cloudEnv == 'AzureCloud' }} TODO: extract env from workflow
+       if: ${{ env.cloudEnv == 'AzureCloud' }}
        with:
-         creds: ${{ env.CREDS }}
+         creds: ${{ secrets.SOURCE_CONTROL_DISPOSAL }}
          enable-AzPSSession: true
      
      - name: Checkout
