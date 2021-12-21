@@ -40,6 +40,7 @@ jobs:
           $cloudEnvMatchInfo = Select-String -Path $workflowPath -Pattern "cloudEnv: '(.*)'"
           $cloudEnv = $cloudEnvMatchInfo[0].Matches.Groups[1].Value
           $disposalSecretName = $cloudEnv -eq "AzurePPE"? "SOURCE_CONTROL_DISPOSAL_DF" : "SOURCE_CONTROL_DISPOSAL"
+          Write-Host $disposalSecretName
           
           echo "::set-output name=source_control_id::$scId"
           echo "::set-output name=resource_group_name::$resourceGroupName"
