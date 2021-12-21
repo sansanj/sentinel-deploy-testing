@@ -39,6 +39,7 @@ jobs:
           $resourceGroupName = $resourceGroupNameMatchInfo[0].Matches.Groups[1].Value
           $cloudEnvMatchInfo = Select-String -Path $workflowPath -Pattern "cloudEnv: '(.*)'"
           $cloudEnv = $cloudEnvMatchInfo[0].Matches.Groups[1].Value  
+          
           echo "::set-output name=source_control_id::$scId"
           echo "::set-output name=resource_group_name::$resourceGroupName"
           echo "::set-output name=workspace_name::$workspaceName"
@@ -48,7 +49,7 @@ jobs:
       source_control_id: ${{ steps.extract-variables.outputs.source_control_id }}
       resource_group_name: ${{ steps.extract-variables.outputs.resource_group_name }}
       workspace_name: ${{ steps.extract-variables.outputs.workspace_name }}
-      cloud_env: ${{ steps.extract-variable.outputs.cloud_env }}
+      cloud_env: ${{ steps.extract-variables.outputs.cloud_env }}
       
   on-success:
    needs: 
@@ -59,7 +60,7 @@ jobs:
      CREDS: ${{ secrets.SOURCE_CONTROL_DISPOSAL_DF }}
      RESOURCE_GROUP_NAME: ${{ needs.on-success-prepare.outputs.resource_group_name }}
      WORKSPACE_NAME: ${{ needs.on-success-prepare.outputs.workspace_name }}
-     CLOUD_ENV: ${{ needs.on-success-prepare.outputs.cloud_env }}
+     CLOUD_ENV: ${{ needs.on-success-prepare.outputs.cloud_env }}     
    steps:
      - name: Login to Azure
        id: login
