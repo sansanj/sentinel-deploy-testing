@@ -58,7 +58,7 @@ jobs:
    runs-on: windows-latest
    env:
      SOURCE_CONTROL_ID: ${{ needs.on-success-prepare.outputs.source_control_id }}
-     CREDS: ${{ secrets['SOURCE_CONTROL_DISPOSAL_DF'] }}
+     CREDS: ${{ secrets.SOURCE_CONTROL_DISPOSAL_DF }}
      RESOURCE_GROUP_NAME: ${{ needs.on-success-prepare.outputs.resource_group_name }}
      WORKSPACE_NAME: ${{ needs.on-success-prepare.outputs.workspace_name }}
      ENV_NAME: ${{ needs.on-success-prepare.outputs.env_name }}
