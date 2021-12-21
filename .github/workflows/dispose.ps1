@@ -1,7 +1,7 @@
 Write-Output "Deleting Source Control"
 
 $sourceControlId = $Env:SOURCE_CONTROL_ID
-$Creds = $Env:CREDS
+$Creds = $Env:CREDS | ConvertFrom-Json
 $subscriptionId = $Creds.subscriptionId
 $tenantId = $Creds.tenantId
 $resourceGroupName = $Env:RESOURCE_GROUP_NAME
@@ -37,23 +37,21 @@ function AttemptAzLogin($psCredential, $tenantId, $cloudEnv) {
 }
 
 function ConnectAzCloud {
-    $RawCreds = $Creds | ConvertFrom-Json
-
     Clear-AzContext -Scope Process;
     Clear-AzContext -Scope CurrentUser -Force -ErrorAction SilentlyContinue;
     
     Add-AzEnvironment `
         -Name $CloudEnv `
-        -ActiveDirectoryEndpoint $RawCreds.activeDirectoryEndpointUrl `
-        -ResourceManagerEndpoint $RawCreds.resourceManagerEndpointUrl `
-        -ActiveDirectoryServiceEndpointResourceId $RawCreds.activeDirectoryServiceEndpointResourceId `
-        -GraphEndpoint $RawCreds.graphEndpointUrl | out-null;
+        -ActiveDirectoryEndpoint $Creds.activeDirectoryEndpointUrl `
+        -ResourceManagerEndpoint $Creds.resourceManagerEndpointUrl `
+        -ActiveDirectoryServiceEndpointResourceId $Creds.activeDirectoryServiceEndpointResourceId `
+        -GraphEndpoint $Creds.graphEndpointUrl | out-null;
 
-    $servicePrincipalKey = ConvertTo-SecureString $RawCreds.clientSecret.replace("'", "''") -AsPlainText -Force
-    $psCredential = New-Object System.Management.Automation.PSCredential($RawCreds.clientId, $servicePrincipalKey)
+    $servicePrincipalKey = ConvertTo-SecureString $Creds.clientSecret.replace("'", "''") -AsPlainText -Force
+    $psCredential = New-Object System.Management.Automation.PSCredential($Creds.clientId, $servicePrincipalKey)
 
-    AttemptAzLogin $psCredential $RawCreds.tenantId $CloudEnv
-    Set-AzContext -Tenant $RawCreds.tenantId | out-null;
+    AttemptAzLogin $psCredential $Creds.tenantId $CloudEnv
+    Set-AzContext -Tenant $Creds.tenantId | out-null;
 }
 
 if ($CloudEnv -ne 'AzureCloud') 
