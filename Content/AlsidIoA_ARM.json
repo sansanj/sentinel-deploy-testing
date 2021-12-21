@@ -25,7 +25,7 @@
       "defaultValue": "AlsidIoA",
       "minLength": 1,
       "metadata": {
-        "description": "Name for the workbook"
+        "description": "Name for the workbook 1"
       }
     }
   },
