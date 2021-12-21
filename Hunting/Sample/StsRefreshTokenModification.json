@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/StsRefreshTokenModification')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Interactive STS refresh token modifications",
+        "category": "Hunting Queries",
+        "query": "// Include your additions to the allow list below as needed\nlet AllowedUserList = dynamic([\"Microsoft Cloud App Security\",\"ADConnectSyncAccount1\",\"SyncAccount2\"]);\nAuditLogs\n| where OperationName has 'StsRefreshTokenValidFrom'\n| where TargetResources[0].modifiedProperties != '[]'\n| where TargetResources[0].modifiedProperties !has 'DirectorySync'\n| extend TargetResourcesModProps = TargetResources[0].modifiedProperties\n| mv-expand TargetResourcesModProps\n| where tostring(TargetResourcesModProps.displayName) =~ 'StsRefreshTokensValidFrom'\n| extend InitiatingUserOrApp = iff(isnotempty(InitiatedBy.user.userPrincipalName),tostring(InitiatedBy.user.userPrincipalName), tostring(InitiatedBy.app.displayName))\n| where InitiatingUserOrApp !in (AllowedUserList)\n| extend targetUserOrApp = TargetResources[0].userPrincipalName\n| extend eventName = tostring(TargetResourcesModProps.displayName)\n| extend oldStsRefreshValidFrom = todatetime(parse_json(tostring(TargetResourcesModProps.oldValue))[0])\n| extend newStsRefreshValidFrom = todatetime(parse_json(tostring(TargetResourcesModProps.newValue))[0])\n| extend tokenMinutesAdded = datetime_diff('minute',newStsRefreshValidFrom,oldStsRefreshValidFrom)\n| extend tokenMinutesRemaining = datetime_diff('minute',TimeGenerated,newStsRefreshValidFrom)\n| project-reorder Result, AADOperationType\n| extend InitiatingIpAddress = iff(isnotempty(InitiatedBy.user.ipAddress), tostring(InitiatedBy.user.ipAddress), tostring(InitiatedBy.app.ipAddress))\n| extend timestamp = TimeGenerated, AccountCustomEntity = InitiatingUserOrApp, IPCustomEntity = InitiatingIpAddress\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This will show Active Directory Security Token Service (STS) refresh token modifications by Service Principals and Applications other than DirectorySync. Refresh tokens are used to validate identification and obtain access tokens.\nThis even"
+          },
+          {
+            "name": "tactics",
+            "value": "CredentialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1550.001"
+          }
+        ]
+      }
+    }
+  ]
+}

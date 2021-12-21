@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/SQLAlertCorrelationwithCommonSecurityLogsandAuditLogs')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "SQL Alert Correlation with CommonSecurityLogs and AuditLogs",
+        "category": "Hunting Queries",
+        "query": "SecurityAlert\n| where AlertName has_any ('Potential SQL Injection', 'A possible vulnerability to SQL Injection')\n| extend EntitiesDynamicArray = parse_json(Entities)\n| mv-expand EntitiesDynamicArray\n| extend EntityType = tostring(parse_json(EntitiesDynamicArray).Type), EntityAddress = tostring(EntitiesDynamicArray.Address)\n| extend IpAddress = iif(EntityType == 'ip', EntityAddress, '')\n| where isnotempty(IpAddress) \n| join kind=inner (\nCommonSecurityLog \n| where DeviceVendor =~ \"Palo Alto Networks\" and Activity =~ \"TRAFFIC\" and DeviceAction != \"deny\"\n| summarize count() by DeviceName, SourceIP, DestinationIP, DestinationPort, Protocol, SourcePort\n)\non $left.IpAddress == $right.SourceIP\n| join kind=inner (\nAuditLogs\n| where LoggedByService =~ \"Core Directory\"\n| where Category =~ \"RoleManagement\"\n| extend IpAddress = case(\nisnotempty(tostring(parse_json(tostring(InitiatedBy.user)).ipAddress)) and tostring(parse_json(tostring(InitiatedBy.user)).ipAddress) != 'null', tostring(parse_json(tostring(InitiatedBy.user)).ipAddress), \nisnotempty(tostring(parse_json(tostring(InitiatedBy.app)).ipAddress)) and tostring(parse_json(tostring(InitiatedBy.app)).ipAddress) != 'null', tostring(parse_json(tostring(InitiatedBy.app)).ipAddress),'Not Available')\n| extend InitiatedBy = iff(isnotempty(tostring(parse_json(tostring(InitiatedBy.user)).userPrincipalName)), \ntostring(parse_json(tostring(InitiatedBy.user)).userPrincipalName), tostring(parse_json(tostring(InitiatedBy.app)).displayName)), UserRoles = tostring(parse_json(tostring(InitiatedBy.user)).ipAddress)\n| extend TargetResourceName = tolower(tostring(TargetResources.[0].displayName))  \n) on IpAddress\n| summarize count () by TimeGenerated,IpAddress,UserRoles,SourcePort,DestinationPort,AccountCustomEntity=InitiatedBy\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This query combines different SQL alerts with CommonSecurityLogs and AuditLogs helping analysts /investigate any possible SQL related attacks faster\n thus reducing Mean Time To Respond"
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess,Impact"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1190,T1078"
+          }
+        ]
+      }
+    }
+  ]
+}

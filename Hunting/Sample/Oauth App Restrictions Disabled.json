@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/OauthAppRestrictionsDisabled')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "GitHub OAuth App Restrictions Disabled",
+        "category": "Hunting Queries",
+        "query": "\nGitHubAudit\n| where Action == \"org.disable_oauth_app_restrictions\"\n| project TimeGenerated, Action, Actor, Country\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This hunting query identifies GitHub OAuth Apps that have restrictions disabled that may be a sign of compromise. Attacker will want to disable such security tools in order to go undetected. "
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence,DefenseEvasion"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1505,T1562"
+          }
+        ]
+      }
+    }
+  ]
+}

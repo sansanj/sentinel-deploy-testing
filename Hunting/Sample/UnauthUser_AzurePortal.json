@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/UnauthUser_AzurePortal')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Failed attempt to access Azure Portal",
+        "category": "Hunting Queries",
+        "query": "\nSigninLogs\n| where AppDisplayName contains \"Azure Portal\"\n// 50126 - Invalid username or password, or invalid on-premises username or password.\n// 50020? - The user doesn't exist in the tenant.\n| where ResultType in ( \"50126\" , \"50020\")\n| extend OS = DeviceDetail.operatingSystem, Browser = DeviceDetail.browser\n| extend StatusCode = tostring(Status.errorCode), StatusDetails = tostring(Status.additionalDetails)\n| extend State = tostring(LocationDetails.state), City = tostring(LocationDetails.city)\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), IPAddresses = makeset(IPAddress), DistinctIPCount = dcount(IPAddress), \nmakeset(OS), makeset(Browser), makeset(City), AttemptCount = count() \nby UserDisplayName, UserPrincipalName, AppDisplayName, ResultType, ResultDescription, StatusCode, StatusDetails, Location, State\n| extend timestamp = StartTime, AccountCustomEntity = UserPrincipalName\n| sort by AttemptCount\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Access attempts to Azure Portal from an unauthorized user. Either invalid password or the user account does not exist."
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1078"
+          }
+        ]
+      }
+    }
+  ]
+}

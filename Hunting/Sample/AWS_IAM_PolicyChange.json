@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/AWS_IAM_PolicyChange')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Changes made to AWS IAM policy",
+        "category": "Hunting Queries",
+        "query": "\nAWSCloudTrail\n| where  EventName in~ (\"AttachGroupPolicy\", \"AttachRolePolicy\", \"AttachUserPolicy\", \"CreatePolicy\",\n\"DeleteGroupPolicy\", \"DeletePolicy\", \"DeleteRolePolicy\", \"DeleteUserPolicy\", \"DetachGroupPolicy\",\n\"PutUserPolicy\", \"PutGroupPolicy\", \"CreatePolicyVersion\", \"DeletePolicyVersion\", \"DetachRolePolicy\", \"CreatePolicy\")\n| project TimeGenerated, EventName, EventTypeName, UserIdentityAccountId, UserIdentityPrincipalid, UserAgent, \nUserIdentityUserName, SessionMfaAuthenticated, SourceIpAddress, AWSRegion, EventSource, AdditionalEventData, ResponseElements\n| extend timestamp = TimeGenerated, IPCustomEntity = SourceIpAddress, AccountCustomEntity = UserIdentityAccountId\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "dentity and Access Management (IAM) securely manages access to AWS services and resources. \nThis query looks for when an API call is made to change an IAM, particularly those related to new policies being \nattached to users and roles, as we"
+          },
+          {
+            "name": "tactics",
+            "value": "PrivilegeEscalation,DefenseEvasion"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1078,T1484"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/ADONewPackageFeedCreated')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Azure DevOps - New Package Feed Created",
+        "category": "Hunting Queries",
+        "query": "let alert_threshold = 0;\nAzureDevOpsAuditing\n| where OperationName matches regex \"Artifacts.Feed.(Org|Project).Create\"\n| extend FeedName = tostring(Data.FeedName)\n| extend FeedId = tostring(Data.FeedId)\n| join kind = leftouter (\nSecurityAlert\n| where ProviderName == \"IPC\"\n| extend AadUserId = tostring(parse_json(Entities)[0].AadUserId)\n| summarize Alerts=count() by AadUserId) on $left.ActorUserId == $right.AadUserId\n| extend Alerts = iif(isempty(Alerts), 0, Alerts)\n| project-reorder TimeGenerated, Details, ActorUPN, IpAddress, UserAgent\n| extend timestamp = TimeGenerated, AccountCustomEntity = ActorUPN, IPCustomEntity = IpAddress\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "An attacker could look to introduce upstream compromised software packages by creating a new package feed within Azure DevOps. This query looks for new Feeds and includes details on any Azure AD Identity Protection alerts related to the use"
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1195"
+          }
+        ]
+      }
+    }
+  ]
+}

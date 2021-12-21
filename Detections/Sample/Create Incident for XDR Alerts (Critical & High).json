@@ -1,0 +1,39 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    },
+    "analytic-id": {
+      "type": "string",
+      "defaultValue": "60e6af9d-e002-45f4-bea9-233905201e1e",
+      "minLength": 1,
+      "metadata": {
+        "description": "Unique id for the scheduled alert rule"
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+      "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/',parameters('analytic-id'))]",
+      "apiVersion": "2020-01-01",
+      "kind": "Scheduled",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "description": "This Query creates an incident based on Trend Micro XDR Workbench Alerts and maps the impacted entities for Azure Sentinel usage. (Critical & High Serverity Alerts)",
+        "displayName": "Create Incident for XDR Alerts (Critical & High)",
+        "enabled": false,
+        "query": "\nlet threshold = 100;\nTrendMicro_XDR_CL        \n| where modelSeverity_s == 'high' or modelSeverity_s  == 'critical'\n| extend AccountCustomEntity = impactScope_account_s, HostCustomEntity = impactScope_hostname_s, IPCustomEntity = impactScope_host_s\n",
+        "queryFrequency": "PT1H",
+        "queryPeriod": "PT1H",
+        "severity": "High",
+        "suppressionDuration": "PT1H",
+        "suppressionEnabled": false,
+        "triggerOperator": "GreaterThan",
+        "triggerThreshold": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/ADAccountLockouts')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "AD Account Lockout",
+        "category": "Hunting Queries",
+        "query": "SecurityEvent\n| where EventID == 4740\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), LockoutsCount = count() by Activity, Account, TargetSid, TargetDomainName, SourceComputerId, SourceDomainController = Computer\n| extend timestamp = StartTime, AccountCustomEntity = Account, HostCustomEntity = TargetDomainName\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Detects Active Directory account lockouts"
+          },
+          {
+            "name": "tactics",
+            "value": "Impact"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1531"
+          }
+        ]
+      }
+    }
+  ]
+}

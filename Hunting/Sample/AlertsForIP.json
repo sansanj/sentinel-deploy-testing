@@ -1,0 +1,34 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/AlertsForIP')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Alerts related to IP",
+        "category": "Hunting Queries",
+        "query": "\nlet GetAllAlertsWithIp = (suspiciousEventTime:datetime, v_ipAddress:string){\n//-3d and +6h as some alerts fire after accumulation of events\nlet v_StartTime = suspiciousEventTime-3d;\nlet v_EndTime = suspiciousEventTime+6h;\nSecurityAlert\n| where TimeGenerated between (v_StartTime .. v_EndTime)\n// expand JSON properties\n| extend Extprop = parse_json(Entities)\n| mv-expand Extprop\n| extend Extprop = parse_json(Extprop)\n| extend IpAddress = iff(Extprop[\"Type\"] == \"ip\",Extprop['Address'], '')\n| where IpAddress == v_ipAddress\n| extend Account = Extprop['Name']\n| extend Domain = Extprop['UPNSuffix']\n| extend Account = iif(isnotempty(Domain) and Extprop['Type']==\"account\", tolower(strcat(Account, \"@\", Domain)), iif(Extprop['Type']==\"account\", tolower(Account), \"\"))\n| extend Computer = iff(Extprop['Type']==\"host\", Extprop['HostName'], '')\n| project StartTimeUtc = StartTime, EndTimeUtc = EndTime, AlertName, Computer, Account, IpAddress, ExtendedProperties, Entities\n| extend timestamp = StartTimeUtc, AccountCustomEntity = Account, HostCustomEntity = Computer, IPCustomEntity = IpAddress\n};\n// change datetime value and <ipaddress> value below\nGetAllAlertsWithIp(datetime('2019-02-05T10:02:51.000'), (\"<ipaddress>\"))\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Any Alerts that fired related to a given IpAddress during the range of +6h and -3d"
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence,Discovery,LateralMovement,Collection"
+          }
+        ]
+      }
+    }
+  ]
+}

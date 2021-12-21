@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/sharepoint_downloads')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "SharePointFileOperation via clientIP with previously unseen user agents",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = starttime - 14d;\nlet historicalUA=\nOfficeActivity\n| where  RecordType == \"SharePointFileOperation\"\n| where Operation in (\"FileDownloaded\", \"FileUploaded\")\n| where TimeGenerated between(lookback..starttime)\n| summarize by ClientIP, UserAgent;\nlet recentUA = OfficeActivity\n| where  RecordType == \"SharePointFileOperation\"\n| where Operation in (\"FileDownloaded\", \"FileUploaded\")\n| where TimeGenerated between(starttime..endtime)\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated) by ClientIP, UserAgent;\nrecentUA | join kind=leftanti (\n   historicalUA\n) on ClientIP, UserAgent\n// Some OfficeActivity records do not contain ClientIP information - exclude these for fewer results\n| where not(isempty(ClientIP))\n| extend timestamp = StartTime, IPCustomEntity = ClientIP\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "New user agents associated with a clientIP for sharepoint file uploads/downloads."
+          },
+          {
+            "name": "tactics",
+            "value": "Exfiltration"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1030"
+          }
+        ]
+      }
+    }
+  ]
+}

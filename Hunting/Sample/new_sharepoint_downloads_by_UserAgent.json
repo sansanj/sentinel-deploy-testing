@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/new_sharepoint_downloads_by_UserAgent')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "SharePointFileOperation via devices with previously unseen user agents",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = starttime - 14d;\nlet historicalActivity=\nOfficeActivity\n| where RecordType == \"SharePointFileOperation\"\n| where Operation in (\"FileDownloaded\", \"FileUploaded\")\n| where TimeGenerated between(lookback..starttime)\n| summarize historicalCount=count() by UserAgent, RecordType;\nlet recentActivity = OfficeActivity\n| where  RecordType == \"SharePointFileOperation\"\n| where Operation in (\"FileDownloaded\", \"FileUploaded\")\n| where TimeGenerated between(starttime..endtime)\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), recentCount=count() by UserAgent, RecordType;\nrecentActivity | join kind = leftanti (\n   historicalActivity\n) on UserAgent, RecordType\n| order by recentCount asc, UserAgent\n| extend timestamp = StartTime\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Tracking via user agent is one way to differentiate between types of connecting device.\nIn homogeneous enterprise environments the user agent associated with an attacker device may stand out as unusual."
+          },
+          {
+            "name": "tactics",
+            "value": "Exfiltration"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1030"
+          }
+        ]
+      }
+    }
+  ]
+}

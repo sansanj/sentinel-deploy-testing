@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/SQL-FailedSQLLogons')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Failed Logon Attempts on SQL Server",
+        "category": "Hunting Queries",
+        "query": "\n// SQLEvent is not the table name, it is the function name that should already be imported into your workspace.\n// The underlying table where the data exists is the Event table.\nSQLEvent\n| where LogonResult has \"failed\"\n| summarize count() by TimeGenerated, CurrentUser, Reason, ClientIP\n| extend timestamp = TimeGenerated, AccountCustomEntity = CurrentUser, IPCustomEntity = ClientIP\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "his query is based on the SQLEvent KQL Parser function (link below) and detects failed logons on SQL Server \nSQLEvent KQL Parser provided at https://github.com/Azure/Azure-Sentinel/tree/master/Parsers/SQLSever\nDetailed blog post on Monitori"
+          },
+          {
+            "name": "tactics",
+            "value": "CredentialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1110"
+          }
+        ]
+      }
+    }
+  ]
+}

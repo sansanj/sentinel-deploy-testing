@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/AnomalousUserAppSigninLocationIncreaseDetail')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Anomalous sign-in location by user account and authenticating application - with sign-in details",
+        "category": "Hunting Queries",
+        "query": "\nSigninLogs \n// Forces Log Analytics to recognize that the query should be run over full time range\n| extend  locationString= strcat(tostring(LocationDetails[\"countryOrRegion\"]), \"/\", \ntostring(LocationDetails[\"state\"]), \"/\", tostring(LocationDetails[\"city\"]), \";\") \n| project TimeGenerated, AppDisplayName , UserPrincipalName, locationString \n// Create time series \n| make-series dLocationCount = dcount(locationString) on TimeGenerated step 1d \nby UserPrincipalName, AppDisplayName \n// Compute best fit line for each entry \n| extend (RSquare,Slope,Variance,RVariance,Interception,LineFit)=series_fit_line(dLocationCount) \n// Chart the 3 most interesting lines  \n// A 0-value slope corresponds to an account being completely stable over time for a given Azure Active Directory application\n| top 3 by Slope desc  \n// Extract the set of locations for each top user:\n| join kind=inner (SigninLogs\n| extend  locationString= strcat(tostring(LocationDetails[\"countryOrRegion\"]), \"/\", \ntostring(LocationDetails[\"state\"]), \"/\", tostring(LocationDetails[\"city\"]), \";\")\n| summarize locationList = makeset(locationString), threeDayWindowLocationCount=dcount(locationString) by AppDisplayName, UserPrincipalName, \ntimerange=bin(TimeGenerated, 3d)) on AppDisplayName, UserPrincipalName\n| order by UserPrincipalName, timerange asc\n| project timerange, AppDisplayName , UserPrincipalName, threeDayWindowLocationCount, locationList \n| order by AppDisplayName, UserPrincipalName, timerange asc\n| extend timestamp = timerange, AccountCustomEntity = UserPrincipalName\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This query over Azure Active Directory sign-in considers all user sign-ins for each Azure Active \nDirectory application and picks out the most anomalous change in location profile for a user within an \nindividual application. The intent is "
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1078"
+          }
+        ]
+      }
+    }
+  ]
+}

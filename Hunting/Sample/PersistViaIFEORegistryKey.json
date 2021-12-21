@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/PersistViaIFEORegistryKey')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Persisting Via IFEO Registry Key",
+        "category": "Hunting Queries",
+        "query": "(union isfuzzy=true\n(\nSecurityEvent\n| where EventID == 4657\n| where ObjectName has_all (\"\\\\REGISTRY\\\\MACHINE\", \"Image File Execution Options\")\n| where ObjectName !endswith \"Image File Execution Options\"\n| summarize Count=count() by Computer, Account, ObjectName\n| top 10 by Count desc \n| extend AccountCustomEntity = Account, HostCustomEntity = Computer\n),\n(\nEvent\n| where Source == \"Microsoft-Windows-Sysmon\"\n| where EventID in (12, 13)\n| extend EventData = parse_xml(EventData).DataItem.EventData.Data\n| mv-expand bagexpansion=array EventData\n| evaluate bag_unpack(EventData)\n| extend Key=tostring(['@Name']), Value=['#text']\n| evaluate pivot(Key, any(Value), TimeGenerated, Source, EventLog, Computer, EventLevel, EventLevelName, EventID, UserName, RenderedDescription, MG, ManagementGroupName, Type, _ResourceId)\n| where TargetObject has_all (\"HKLM\", \"Image File Execution Options\")\n| summarize Count=count() by Computer, UserName, tostring(TargetObject)\n| top 10 by Count desc\n| extend AccountCustomEntity = UserName, HostCustomEntity = Computer\n),\n(\nimRegistry\n| where RegistryKey has_all (\"HKEY_LOCAL_MACHINE\", \"Image File Execution Options\")\n| summarize Count=count() by Dvc, Username, RegistryKey\n| top 10 by Count desc\n| extend AccountCustomEntity = Username, HostCustomEntity = Dvc\n)\n)\n)\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This query detects instances where IFEO registry keys were created and deleted frequently within a short period of time."
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1546.012"
+          }
+        ]
+      }
+    }
+  ]
+}

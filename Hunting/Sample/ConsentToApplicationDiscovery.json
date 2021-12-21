@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/ConsentToApplicationDiscovery')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Consent to Application discovery",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet auditLookback = starttime - 14d;\n// Setting threshold to 3 as a default, change as needed.  Any operation that has been initiated by a user or app more than 3 times in the past 30 days will be exluded\nlet threshold = 3;\n// Helper function to extract relevant fields from AuditLog events\nlet auditLogEvents = view (startTimeSpan:timespan)  {\n    AuditLogs | where TimeGenerated >= auditLookback\n    | extend ModProps = TargetResources.[0].modifiedProperties\n    | extend IpAddress = iff(isnotempty(tostring(parse_json(tostring(InitiatedBy.user)).ipAddress)),\n    tostring(parse_json(tostring(InitiatedBy.user)).ipAddress), tostring(parse_json(tostring(InitiatedBy.app)).ipAddress))\n    | extend InitiatedBy = iff(isnotempty(tostring(parse_json(tostring(InitiatedBy.user)).userPrincipalName)),\n    tostring(parse_json(tostring(InitiatedBy.user)).userPrincipalName), tostring(parse_json(tostring(InitiatedBy.app)).displayName))\n    | extend TargetResourceName = tolower(tostring(TargetResources.[0].displayName))\n    | mvexpand ModProps\n    | extend PropertyName = tostring(ModProps.displayName), newValue = replace('\\\"',\"\",tostring(ModProps.newValue));\n};\n// Get just the InitiatedBy and CorrleationId so we can look at associated audit activity\n// 2 other operations that can be part of malicious activity in this situation are\n// \"Add OAuth2PermissionGrant\" and \"Add service principal\", replace the below if you are interested in those as starting points for OperationName\nlet HistoricalConsent = auditLogEvents(auditLookback)\n| where OperationName == \"Consent to application\"\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), OperationCount = count()\nby Type, InitiatedBy, IpAddress, TargetResourceName, Category, OperationName, PropertyName, newValue, CorrelationId, Id\n// Remove comment below to only include operations initiated by a user or app that is above the threshold for the last 30 days\n//| where OperationCount > threshold\n;\nlet Correlate = HistoricalConsent\n| summarize by InitiatedBy, CorrelationId;\n// 2 other operations that can be part of malicious activity in this situation are\n// \"Add OAuth2PermissionGrant\" and \"Add service principal\", replace the below if you changed the starting OperationName above\nlet allOtherEvents = auditLogEvents(auditLookback)\n| where OperationName != \"Consent to application\";\n// Gather associated activity based on audit activity for \"Consent to application\" and InitiatedBy and CorrleationId\nlet CorrelatedEvents = Correlate\n| join allOtherEvents on InitiatedBy, CorrelationId\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated)\nby Type, InitiatedBy, IpAddress, TargetResourceName, Category, OperationName, PropertyName, newValue, CorrelationId, Id\n;\n// Union the results\nlet Results = (union isfuzzy=true HistoricalConsent,CorrelatedEvents);\n// newValues that are simple semi-colon separated, make those dynamic for easy viewing and Aggregate into the PropertyUpdate set based on CorrelationId and Id(DirectoryId)\nResults\n| extend newValue = split(newValue, \";\")\n| extend PropertyUpdate = pack(PropertyName, newValue, \"Id\", Id)\n// Extract scope requested\n| extend perms = tostring(parse_json(tostring(PropertyUpdate.[\"ConsentAction.Permissions\"]))[0])\n| extend scope = extract('Scope:\\\\s*([^,\\\\]]*)',1, perms)\n// Filter out some common openid, and low privilege request scopes - uncomment line below to filter out where no scope is requested\n//| where isnotempty(scope)\n| where scope !contains 'openid' and scope !in ('user_impersonation','User.Read')\n| summarize StartTime = min(StartTimeUtc), EndTime = max(EndTimeUtc), PropertyUpdateSet = make_bag(PropertyUpdate) , make_set(scope)\n  by InitiatedBy, IpAddress, TargetResourceName, OperationName, CorrelationId\n| extend timestamp = StartTime, AccountCustomEntity = InitiatedBy, IPCustomEntity = IpAddress\n// uncommnet below to summarize by app if many results\n//| summarize make_set(InitiatedBy), make_set(IpAddress), make_set(PropertyUpdateSet) by TargetResourceName, tostring(set_scope)\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This query looks at the last 14 days for any \"Consent to application\" operation\noccurs by a user or app. This could indicate that permissions to access the listed AzureApp\nwas provided to a malicious actor. Consent to appliction, Add servic"
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1136"
+          }
+        ]
+      }
+    }
+  ]
+}

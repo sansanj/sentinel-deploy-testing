@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/New_WindowsReservedFileNamesOnOfficeFileServices')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "New Windows Reserved Filenames staged on Office file services",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = totimespan((endtime-starttime)*7);\n// a threshold can be enabled, see commented line below for PrevSeenCount\nlet threshold = 1;\n// Reserved FileNames/Extension for Windows\nlet Reserved = dynamic(['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9']);\nOfficeActivity | where TimeGenerated between(starttime..endtime)\n| where isnotempty(SourceFileExtension)\n| where SourceFileName !~ SourceFileExtension\n| where SourceFileExtension in~ (Reserved) or SourceFileName in~ (Reserved)\n| where UserAgent !has \"Mac OS\"\n| project TimeGenerated, OfficeId, OfficeWorkload, RecordType, Operation, UserType, UserKey, UserId, ClientIP, UserAgent, Site_Url, SourceRelativeUrl, SourceFileName, SourceFileExtension\n| join kind= leftanti (\nOfficeActivity | where TimeGenerated between (ago(lookback)..starttime)\n| where isnotempty(SourceFileExtension)\n| where SourceFileName !~ SourceFileExtension\n| where SourceFileExtension in~ (Reserved) or SourceFileName in~ (Reserved)\n| where UserAgent !has \"Mac OS\"\n| summarize SourceRelativeUrl = make_set(SourceRelativeUrl), UserId = make_set(UserId), SourceFileName = make_set(SourceFileName) , PrevSeenCount = count() by SourceFileExtension\n// To exclude previous matches when only above a specific count, change threshold above and uncomment the line below\n//| where PrevSeenCount > threshold\n| mvexpand SourceRelativeUrl, UserId, SourceFileName\n| extend SourceRelativeUrl = tostring(SourceRelativeUrl), UserId = tostring(UserId), SourceFileName = tostring(SourceFileName)\n) on SourceFileExtension\n| extend SiteUrlUserFolder = tolower(split(Site_Url, '/')[-2])\n| extend UserIdUserFolderFormat = tolower(replace('@|\\\\.', '_',UserId))\n// identify when UserId is not a match to the specific site url personal folder reference\n| extend UserIdDiffThanUserFolder = iff(Site_Url has '/personal/' and SiteUrlUserFolder != UserIdUserFolderFormat, true , false )\n| summarize TimeGenerated = make_list(TimeGenerated), StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), Operations = make_list(Operation), UserAgents = make_list(UserAgent),\nOfficeIds = make_list(OfficeId), SourceRelativeUrls = make_list(SourceRelativeUrl), FileNames = make_list(SourceFileName)\nby OfficeWorkload, RecordType, UserType, UserKey, UserId, ClientIP, Site_Url, SourceFileExtension, SiteUrlUserFolder, UserIdUserFolderFormat, UserIdDiffThanUserFolder\n// Use mvexpand on any list items and you can expand out the exact time and other metadata about the hit\n| extend timestamp = StartTime, AccountCustomEntity = UserId, IPCustomEntity = ClientIP\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Identifies when new Windows Reserved Filenames show up on Office services such as SharePoint and OneDrive in relation to the previous 7 days.\nList currently includes 'CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6'"
+          },
+          {
+            "name": "tactics",
+            "value": "CommandAndControl"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1105"
+          }
+        ]
+      }
+    }
+  ]
+}

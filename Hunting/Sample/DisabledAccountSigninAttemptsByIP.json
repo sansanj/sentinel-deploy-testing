@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/DisabledAccountSigninAttemptsByIP')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Attempts to sign in to disabled accounts by IP address",
+        "category": "Hunting Queries",
+        "query": "\nSigninLogs \n| where ResultType == \"50057\" \n| where ResultDescription == \"User account is disabled. The account has been disabled by an administrator.\" \n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), numberAccountsTargeted = dcount(UserPrincipalName), \nnumberApplicationsTargeted = dcount(AppDisplayName), accountSet = makeset(UserPrincipalName), applicationSet=makeset(AppDisplayName), \nnumberLoginAttempts = count() by IPAddress\n| extend timestamp = StartTime, IPCustomEntity = IPAddress\n| order by numberLoginAttempts desc\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Failed attempts to sign in to disabled accounts summarized by the IP address from from the sign-in attempts originate"
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1078"
+          }
+        ]
+      }
+    }
+  ]
+}

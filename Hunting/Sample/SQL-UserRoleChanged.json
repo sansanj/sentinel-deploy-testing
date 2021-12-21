@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/SQL-UserRoleChanged')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "User Role altered on SQL Server",
+        "category": "Hunting Queries",
+        "query": "\n// SQLEvent is not the table name, it is the function name that should already be imported into your workspace.\n// The underlying table where the data exists is the Event table.\n// This query looking for Alter role commands and extracts username which was altered and target objectName\nSQLEvent\n| where Statement contains \"Alter role\" and Statement has \"add member\"\n| parse Statement with * \"ADD MEMBER [\" TargetUser:string \"]\" *\n| project TimeGenerated, Computer, Action, ClientIP, CurrentUser, DatabaseName, TargetUser, ObjectName, Statement\n| extend timestamp = TimeGenerated, AccountCustomEntity = CurrentUser, IPCustomEntity = ClientIP  \n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "his hunting query identifies user role altered on SQL Server\nThis query is based on the SQLEvent KQL Parser function (link below) \nSQLEvent KQL Parser provided at https://github.com/Azure/Azure-Sentinel/tree/master/Parsers/SQLSever\nDetailed"
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence,PrivilegeEscalation"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1098,T1078"
+          }
+        ]
+      }
+    }
+  ]
+}

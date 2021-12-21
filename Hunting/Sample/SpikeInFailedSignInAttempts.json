@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/SpikeInFailedSignInAttempts')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Spike in failed sign-in events",
+        "category": "Hunting Queries",
+        "query": "let starttime = todatetime('{{StartTimeISO}}');\nlet auditLookback = starttime - 14d;\nlet ts_data = (SigninLogs\n| where TimeGenerated between(auditLookback..starttime)\n| where ResultType != 0\n| make-series count() on TimeGenerated step 1h by UserPrincipalName\n| extend series_decompose(count_)\n| extend NoLogons = count_);\nlet TimeSeriesAlerts=ts_data\n  | extend (anomalies, score, baseline) = series_decompose_anomalies(count_, 1.5, -1, 'linefit',0, 'ctukey', 0.7)\n  | mv-expand NoLogons to typeof(double), TimeGenerated to typeof(datetime), anomalies to typeof(double),score to typeof(double), baseline to typeof(long)\n  | where anomalies > 0\n  | project UserPrincipalName, TimeGenerated, NoLogons, baseline, anomalies, score;\nTimeSeriesAlerts\n  | join kind=inner (\n  SigninLogs\n  | summarize ResultTypeCount=count(),ResultTypes=make_set(ResultType), Locations=make_set(Location), Apps=make_set(AppDisplayName), Ips=make_set( IPAddress) by UserPrincipalName, bin(TimeGenerated, 1h)\n  ) on UserPrincipalName, TimeGenerated\n  | summarize AnomolyTimes = make_set(TimeGenerated), Ips = make_set(Ips), Apps = make_set(Apps), sum(anomalies), Locations=make_set(Locations) by UserPrincipalName\n  | sort by sum_anomalies desc\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Identifies spikes in failed sign-in events based on the volume of failed sign-in events over time. Use to identify patterns of suspicious behavior such as unusually high failed sign-in attempts from certain users.\nRef : https://docs.microso"
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1078.004"
+          }
+        ]
+      }
+    }
+  ]
+}

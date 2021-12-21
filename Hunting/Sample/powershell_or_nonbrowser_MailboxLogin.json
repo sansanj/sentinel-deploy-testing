@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/powershell_or_nonbrowser_MailboxLogin')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Powershell or non-browser mailbox login activity",
+        "category": "Hunting Queries",
+        "query": "\nOfficeActivity\n| where Operation == \"MailboxLogin\"\n| where ClientInfoString == \"Client=Microsoft.Exchange.Powershell; Microsoft WinRM Client\"\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), count() by Operation, OrganizationName, UserType, UserId, MailboxOwnerUPN, Logon_Type, ClientInfoString\n| extend timestamp = StartTime, AccountCustomEntity = UserId\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This will help you determine if mailbox login was done from Exchange Powershell session. \nBy default, all accounts you create in Office 365 are allowed to use Exchange Online PowerShell. \nAdministrators can use Exchange Online PowerShell to"
+          },
+          {
+            "name": "tactics",
+            "value": "Execution,Persistence,Collection"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1059,T1098,T1114"
+          }
+        ]
+      }
+    }
+  ]
+}

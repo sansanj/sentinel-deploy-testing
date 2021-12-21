@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/AzureStorageFileOnEndpoint')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Storage File Seen on Endpoint",
+        "category": "Hunting Queries",
+        "query": "\nunion StorageFileLogs,\nStorageBlobLogs\n//File upload operations\n| where OperationName =~ \"PutBlob\" or OperationName =~ \"PutRange\"\n//Parse out the uploader IP\n| extend ClientIP = tostring(split(CallerIpAddress, \":\", 0)[0])\n//Extract the filename from the Uri\n| extend FileName = extract(@\"\\/([\\w\\-. ]+)\\?\", 1, Uri)\n//Base64 decode the MD5 filehash, we will encounter non-ascii hex so string operations don't work\n//We can work around this by making it an array then converting it to hex from an int\n| extend base64Char = base64_decode_toarray(ResponseMd5)\n| mv-expand base64Char\n| extend hexChar = tohex(toint(base64Char))\n| extend hexChar = iff(strlen(hexChar) < 2, strcat(\"0\", hexChar), hexChar)\n| extend SourceTable = iff(OperationName has \"range\", \"StorageFileLogs\", \"StorageBlobLogs\")\n| summarize make_list(hexChar) by CorrelationId, ResponseMd5, FileName, AccountName, TimeGenerated, RequestBodySize, ClientIP, SourceTable\n| extend Md5Hash = strcat_array(list_hexChar, \"\")\n| project-away list_hexChar, ResponseMd5\n| join (\n  DeviceFileEvents\n  | where ActionType =~ \"FileCreated\"\n  | where isnotempty(MD5)\n  | extend p = pack(\"FileCreateTime\", TimeGenerated, \"Device\", DeviceName, \"DeviceId\", DeviceId, \"FileName\", FileName, \"InititatingProcess\", InitiatingProcessFileName)\n  | summarize make_bag(p), dcount(DeviceName) by MD5\n) on $left.Md5Hash == $right.MD5\n| project TimeGenerated, FileName, FileHashCustomEntity=Md5Hash, AccountName, SourceTable, DevicesImpacted=dcount_DeviceName, Entitites=bag_p\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Finds instances where a file uploaded to blob or file storage and it is seen on an endpoint by Microsoft 365 Defender."
+          },
+          {
+            "name": "tactics",
+            "value": "LateralMovement"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1570"
+          }
+        ]
+      }
+    }
+  ]
+}

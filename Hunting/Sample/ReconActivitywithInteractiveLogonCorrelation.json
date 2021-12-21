@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/ReconActivitywithInteractiveLogonCorrelation')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Recon Activity with Interactive Logon Correlation",
+        "category": "Hunting Queries",
+        "query": "SecurityAlert\n| where AlertName has_any ('Atypical travel','Unfamiliar sign-in properties','Anonymous IP address','Malware linked IP address','Malicious IP address','Password Spray','Targeted port scans')\n| summarize count(),make_set(AlertName) by WorkspaceSubscriptionId,CompromisedEntity= toupper(CompromisedEntity),TimeGenerated\n| extend number_alerts = array_length(set_AlertName)\n| join kind=inner\n(\nSecurityEvent\n| where EventID == 4624 and LogonType == 10\n  | project  Account = tolower(Account), Computer = toupper(Computer), IpAddress, AccountType, Activity, LogonTypeName,Interactivelogontime=TimeGenerated\n  ) on  $left.CompromisedEntity==$right.Computer\n  | project TimeGenerated,Interactivelogontime,AccountCustomEntity=Account,AccountType,CompromisedEntity,Activity,IpAddress\n  | extend TimeWindow = TimeGenerated + 15m\n  | where Interactivelogontime between (TimeGenerated .. TimeWindow)\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This query looks at correlating different reconnaissance alerts with interactive logon logs to help analysts investigate initial possible compromise activity"
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess,Impact"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1190,T1078"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/AzDODisplayNameSwapping')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Azure DevOps Display Name Changes",
+        "category": "Hunting Queries",
+        "query": "\nAzureDevOpsAuditing\n| where ActorCUID != '00000000-0000-0000-0000-000000000000' and ActorDisplayName != \"Azure DevOps User\"\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), DisplayNameCount = dcount(ActorDisplayName), ActorDisplayNames = make_set(ActorDisplayName), make_set(IpAddress), make_set(ProjectName) by ActorCUID, ActorUPN\n| where DisplayNameCount > 1\n| extend timestamp = StartTime, AccountCustomEntity = ActorUPN\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Shows all users with more than 1 display name in recent history.  This is to hunt for users maliciously changing their display name as a masquerading technique"
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence,DefenseEvasion"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1098,T1036"
+          }
+        ]
+      }
+    }
+  ]
+}

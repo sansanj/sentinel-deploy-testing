@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/HighCPURoom')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Zoom room high CPU alerts",
+        "category": "Hunting Queries",
+        "query": "\nZoomLogs \n| where Event =~ \"zoomroom.alert\" \n| extend AlertType = toint(parse_json(RoomEvents).AlertType), AlertKind = toint(parse_json(RoomEvents).AlertKind) \n| extend RoomName = payload_object_room_name_s, User = payload_object_email_s\n| where AlertType == 1 and AlertKind == 1 \n| extend timestamp = TimeGenerated, AccountCustomEntity = User\n// Uncomment the lines below to analyse event over time\n//| summarize count() by bin(TimeGenerated, 1h), RoomName\n//| render timechart\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This hunting query identifies Zoom room systems with high CPU alerts that may be a sign of device compromise."
+          },
+          {
+            "name": "tactics",
+            "value": "DefenseEvasion,Persistence"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1542"
+          }
+        ]
+      }
+    }
+  ]
+}

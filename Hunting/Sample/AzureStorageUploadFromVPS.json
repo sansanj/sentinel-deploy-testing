@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/AzureStorageUploadFromVPS')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Azure Storage file upload from VPS Providers",
+        "category": "Hunting Queries",
+        "query": "\nlet IP_Data = (externaldata(network:string)\n[@\"https://raw.githubusercontent.com/Azure/Azure-Sentinel/master/Sample%20Data/Feeds/VPS_Networks.csv\"] with (format=\"csv\"));\nunion\nStorageFileLogs,\nStorageBlobLogs\n//File upload operations\n| where StatusText =~ \"Success\"\n| where OperationName =~ \"PutBlob\" or OperationName =~ \"PutRange\"\n| evaluate ipv4_lookup(IP_Data, CallerIpAddress, network, return_unmatched = false)\n| summarize make_set(OperationName), min(TimeGenerated), max(TimeGenerated) by IPCustomEntity=CallerIpAddress, URLCustomEntity=Uri  \n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Looks for file uploads actions to Azure File and Blob Storage from known VPS provider network ranges.\nThis is not an exhaustive list of VPS provider ranges but covers some of the most prevalent providers observed."
+          },
+          {
+            "name": "tactics",
+            "value": "LateralMovement"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1570"
+          }
+        ]
+      }
+    }
+  ]
+}

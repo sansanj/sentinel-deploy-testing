@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/AzureRunCommandFromAzureIP')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Azure VM Run Command executed from Azure IP address",
+        "category": "Hunting Queries",
+        "query": "let azure_ranges = externaldata(changeNumber: string, cloud: string, values: dynamic)\n[\"https://download.microsoft.com/download/7/1/D/71D86715-5596-4529-9B13-DA13A5DE5B63/ServiceTags_Public_20211018.json\"]\nwith(format='multijson')\n| mv-expand values\n// Limit to virtual desktop IP ranges, uncomment to see all Azure ranges\n| where values contains \"VirtualDesktop\"\n| mv-expand values.properties.addressPrefixes\n| mv-expand values_properties_addressPrefixes\n| summarize by tostring(values_properties_addressPrefixes);\nAzureActivity\n| where TimeGenerated > ago(30d)\n// Isolate run command actions\n| where OperationNameValue == \"Microsoft.Compute/virtualMachines/runCommand/action\"\n// Confirm that the operation impacted a virtual machine\n| where Authorization has \"virtualMachines\"\n// Each runcommand operation consists of three events when successful, Started, Accepted (or Rejected), Successful (or Failed).\n| summarize StartTime=min(TimeGenerated), EndTime=max(TimeGenerated), max(CallerIpAddress), make_list(ActivityStatusValue) by CorrelationId, Authorization, Caller\n// Limit to Run Command executions that Succeeded\n| where list_ActivityStatusValue has \"Succeeded\"\n// Extract data from the Authorization field, allowing us to later extract the Caller (UPN) and CallerIpAddress\n| extend Authorization_d = parse_json(Authorization)\n| extend Scope = Authorization_d.scope\n| extend Scope_s = split(Scope, \"/\")\n| extend Subscription = tostring(Scope_s[2])\n| extend VirtualMachineName = tostring(Scope_s[-1])\n| project StartTime, EndTime, Subscription, VirtualMachineName, CorrelationId, Caller, CallerIpAddress=max_CallerIpAddress\n| evaluate ipv4_lookup(azure_ranges, CallerIpAddress, values_properties_addressPrefixes)\n| extend timestamp = StartTime, IPCustomEntity=CallerIpAddress\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Identifies any Azure VM Run Command operation executed from an Azure IP address.\nRun Command allows an attacker or legitimate user to execute aribitrary PowerShell\non a target VM. This technique has been seen in use by NOBELIUM."
+          },
+          {
+            "name": "tactics",
+            "value": "LateralMovement,CredentialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1570,T1078.004"
+          }
+        ]
+      }
+    }
+  ]
+}

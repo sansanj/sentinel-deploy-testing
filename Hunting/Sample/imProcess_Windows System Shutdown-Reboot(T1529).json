@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/imProcess_WindowsSystemShutdown-Reboot(T1529)')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Windows System Shutdown/Reboot (Normalized Process Events)",
+        "category": "Hunting Queries",
+        "query": "let timeframe = 1d;\nimProcessCreate\n| where Process has \"shutdown.exe\" \n| extend HostCustomEntity = Dvc, AccountCustomEntity = User\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This detection uses Normalized Process Events to detect System Shutdown/Reboot (MITRE Technique: T1529)"
+          },
+          {
+            "name": "tactics",
+            "value": "Impact"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1529"
+          }
+        ]
+      }
+    }
+  ]
+}

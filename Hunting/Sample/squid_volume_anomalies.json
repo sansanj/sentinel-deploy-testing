@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/squid_volume_anomalies')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Squid data volume timeseries anomalies",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet timeframe = 1h;\nlet TimeSeriesData =\nSyslog\n| where TimeGenerated between(starttime..endtime)\n| where ProcessName contains \"squid\"\n| extend URL = extract(\"(([A-Z]+ [a-z]{4,5}:\\\\/\\\\/)|[A-Z]+ )([^ :]*)\",3,SyslogMessage),\n         SourceIP = extract(\"([0-9]+ )(([0-9]{1,3})\\\\.([0-9]{1,3})\\\\.([0-9]{1,3})\\\\.([0-9]{1,3}))\",2,SyslogMessage),\n         Status = extract(\"(TCP_(([A-Z]+)(_[A-Z]+)*)|UDP_(([A-Z]+)(_[A-Z]+)*))\",1,SyslogMessage),\n         HTTP_Status_Code = extract(\"(TCP_(([A-Z]+)(_[A-Z]+)*)|UDP_(([A-Z]+)(_[A-Z]+)*))/([0-9]{3})\",8,SyslogMessage),\n         User = extract(\"(CONNECT |GET )([^ ]* )([^ ]+)\",3,SyslogMessage),\n         RemotePort = extract(\"(CONNECT |GET )([^ ]*)(:)([0-9]*)\",4,SyslogMessage),\n         Domain = extract(\"(([A-Z]+ [a-z]{4,5}:\\\\/\\\\/)|[A-Z]+ )([^ :\\\\/]*)\",3,SyslogMessage),\n         Bytes = toint(extract(\"([A-Z]+\\\\/[0-9]{3} )([0-9]+)\",2,SyslogMessage)),\n         contentType = extract(\"([a-z/]+$)\",1,SyslogMessage)\n| extend TLD = extract(\"\\\\.[a-z]*$\",0,Domain)\n| where isnotempty(Bytes)\n| make-series TotalBytesSent=sum(Bytes) on TimeGenerated from startofday(starttime) to startofday(endtime) step timeframe by ProcessName;\nTimeSeriesData\n| extend (anomalies, score, baseline) = series_decompose_anomalies(TotalBytesSent,3, -1, 'linefit')\n| extend timestamp = TimeGenerated\n| render timechart with (title=\"Squid Time Series anomalies\")\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Malware infections or data exfiltration activity often leads to anomalies in network data volume\nthis hunting query looks for anomalies in the volume of bytes traversing a squid proxy. Anomalies require further\ninvestigation to determine ca"
+          },
+          {
+            "name": "tactics",
+            "value": "CommandAndControl,Exfiltration"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1071,T1030"
+          }
+        ]
+      }
+    }
+  ]
+}

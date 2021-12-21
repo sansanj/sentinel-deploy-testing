@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/WebShellActivity')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Web Shell Activity",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = starttime - (3d);\nlet script_extensions = dynamic([\".asp\", \".aspx\", \".armx\", \".asax\", \".ashz\", \".asmx\", \".axd\", \".cshtml\", \".php\", \".phps\", \".php3\", \".php4\", \".php5\", \".php7\", \".jsp\", \".jspx\", \".cfm\", \".cfml\", \".phtml\"]);\nlet ignore_uristems = dynamic([\"/ews/exchange.asmx\"]);\nlet lookback_period = (\nW3CIISLog\n| where TimeGenerated between (lookback .. starttime)\n| where not(ipv4_is_private(cIP)) and cIP != \"127.0.0.1\"\n| summarize count() by cIP, csUserAgent\n| project cIP, csUserAgent\n);\nlet potential_webshell_activity = (W3CIISLog\n| where TimeGenerated between (starttime .. endtime)\n| extend csUriStem = tolower(csUriStem)\n| where csUriStem matches regex \"\\\\.[a-zA-Z][a-zA-Z0-9]+$\"\n| where csUriStem !in~ (ignore_uristems) // Remove noisy uri stems in the final results by editing the ignore_uristems variable\n| extend suffix = strcat(\".\", split(split(csUriStem, \"/\")[-1], \".\")[-1])\n| extend is_script = iff(suffix in (script_extensions), 1, 0)\n| where not(ipv4_is_private(cIP)) and cIP != \"127.0.0.1\"\n| extend status_xx = strcat(substring(tostring(scStatus), 0, 1), 'XX')\n| serialize cIP, csUserAgent, TimeGenerated\n| extend SessionStarted = row_window_session(TimeGenerated, 30s, 3s, (cIP != prev(cIP)) and (csUserAgent != prev(csUserAgent))));\nlet dynamic_scripts = (potential_webshell_activity\n| where is_script == 1\n| summarize set_dynamic_scripts = make_set(csUriStem) by cIP, csUserAgent, SessionStarted);\nlet non_dynamic_scripts = (potential_webshell_activity\n| where is_script == 0\n| summarize set_non_dynamic_scripts = make_set(csUriStem) by cIP, csUserAgent, SessionStarted);\npotential_webshell_activity\n| summarize num_non_dyn_scripts = count() - sum(is_script), num_dynamic_scripts = sum(is_script) by cIP, csUserAgent, SessionStarted\n| join kind=leftanti (lookback_period) on cIP, csUserAgent\n| join kind=inner (dynamic_scripts) on cIP, csUserAgent, SessionStarted\n| join kind=leftouter (non_dynamic_scripts) on cIP, csUserAgent, SessionStarted\n| extend dyn_to_non_dyn_ratio = iff(num_non_dyn_scripts == 0, 10000.0, 1.0 * num_dynamic_scripts/num_non_dyn_scripts)\n| project cIP, csUserAgent, SessionStarted,  num_dynamic_scripts, set_dynamic_scripts, num_non_dyn_scripts, set_non_dynamic_scripts,  dyn_to_non_dyn_ratio\n| sort by dyn_to_non_dyn_ratio desc, num_dynamic_scripts desc\n| extend summary = pack('IPCustomEntity', cIP, 'user_agent', csUserAgent, 'num_dynamic_scripts', num_dynamic_scripts, 'set_dynamic_scripts', set_dynamic_scripts, 'num_non_dyn_scripts', num_non_dyn_scripts, 'set_non_dynamic_scripts', set_non_dynamic_scripts, 'ratio', dyn_to_non_dyn_ratio, 'Session_StartTime', SessionStarted)\n| summarize summaries=make_list(summary), num_of_sessions_on_day = count() by cIP, csUserAgent\n| sort by num_of_sessions_on_day asc\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Web shells are scripts that, when uploaded to a web server, can be used to provide a backdoor to a compromised network.\nAttackers can use this entry point to leave malicious implants, such as obtaining unauthorized access, escalating privil"
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence,InitialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1505"
+          }
+        ]
+      }
+    }
+  ]
+}

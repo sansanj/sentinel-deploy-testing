@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/Granting_Permissions_to_Account')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Granting permissions to account",
+        "category": "Hunting Queries",
+        "query": "\nAzureActivity\n| where OperationName == \"Create role assignment\"\n| where ActivityStatus == \"Succeeded\" \n| project Caller, CallerIpAddress\n| evaluate basket()\n| join kind=leftouter (AzureActivity\n| where OperationName == \"Create role assignment\"\n| where ActivityStatus == \"Succeeded\"\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated) by Caller, CallerIpAddress)\non Caller, CallerIpAddress\n| project-away Caller1, CallerIpAddress1\n| where isnotempty(StartTime)\n| extend timestamp = StartTime, AccountCustomEntity = Caller, IPCustomEntity = CallerIpAddress\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Shows the most prevalent users who grant access to others on azure resources and for each account \ntheir common source ip address. If an operation is not from this IP address it may be worthy of investigation."
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence,PrivilegeEscalation"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1098"
+          }
+        ]
+      }
+    }
+  ]
+}

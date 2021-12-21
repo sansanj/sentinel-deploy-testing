@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/UserRunningMultipleQueriesThatFail')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "User running multiple queries that fail",
+        "category": "Hunting Queries",
+        "query": "\nlet timeframe = 1h;\nlet threshold = 10;\nLAQueryLogs\n| where ResponseCode != 200\n| summarize count() by AADEmail, bin(TimeGenerated, timeframe)\n| where count_ > threshold\n| join kind=rightsemi (\nLAQueryLogs\n| summarize make_set(QueryText) by AADEmail, bin(TimeGenerated, timeframe))\non AADEmail, TimeGenerated\n| extend timestamp = TimeGenerated, AccountCustomEntity = AADEmail\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This hunting query looks for users who have multiple failed queries in a short space of time."
+          },
+          {
+            "name": "tactics",
+            "value": "Exfiltration"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1020"
+          }
+        ]
+      }
+    }
+  ]
+}

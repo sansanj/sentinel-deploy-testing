@@ -1,0 +1,25 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-08-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/imRegistry')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "etag": "*",
+        "displayName": "ASIM Source Agnostic Registry Events Parser",
+        "category": "Security",
+        "FunctionAlias": "imRegistry",
+        "query": "union isfuzzy=true\n  vimRegistryEventEmpty,\n  vimRegistryEventMicrosoft365D,\n  vimRegistryEventMicrosoftSysmon,\n  vimRegistryEventMicrosoftSecurityEvents,\n  vimRegistryEventMicrosoftWindowsEvent",
+        "version": 1
+      }
+    }
+  ]
+}

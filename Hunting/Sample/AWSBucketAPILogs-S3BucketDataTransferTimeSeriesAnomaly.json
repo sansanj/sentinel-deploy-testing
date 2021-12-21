@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/AWSBucketAPILogs-S3BucketDataTransferTimeSeriesAnomaly')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "S3 Bucket outbound Data transfer anomaly",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = starttime - 14d;\nlet timeframe = 1h;\nlet scorethreshold = 1.5;\n// Preparing the time series data aggregated on BytesTransferredOut column in the form of multi-value array so that it can be used with time series anomaly function.\nlet TimeSeriesData=\nAwsBucketAPILogs_CL\n| where EventTime between (lookback..endtime)\n| where EventName == \"GetObject\"\n| make-series Total=sum(BytesTransferredOut) on EventTime from startofday(starttime) to startofday(endtime) step timeframe;\n// Use the time series data prepared in previous step with time series aomaly function to generate baseline pattern and flag the outlier based on scorethreshold value.\nlet TimeSeriesAlerts = TimeSeriesData\n| extend (anomalies, score, baseline) = series_decompose_anomalies(Total, scorethreshold, -1, 'linefit')\n| mv-expand Total to typeof(double), EventTime to typeof(datetime), anomalies to typeof(double), score to typeof(double), baseline to typeof(long)\n| where anomalies > 0\n| project EventTime, Total, baseline, anomalies, score;\n// Joining the flagged outlier from the previous step with the original dataset to present contextual information during the anomalyhour to analysts to conduct investigation or informed decistions.\nTimeSeriesAlerts\n| join\n(\n  AWSS3BucketAPILogParsed\n  | where EventTime between (startofday(lookback)..endofday(endtime))\n  | where EventName == \"GetObject\"\n  | summarize Total = sum(BytesTransferredOut), Files= makeset(Key) , max(EventTime) by bin(EventTime, 1h), EventSource,EventName, SourceIPAddress, UserIdentityType, UserIdentityArn, UserIdentityUserName, BucketName, Host, AuthenticationMethod, SessionMfaAuthenticated, SessionUserName\n) on EventTime\n| project AnomalyTime = max_EventTime, SourceIPAddress, UserIdentityType,UserIdentityUserName,SessionUserName, BucketName, Host, AuthenticationMethod, Files, Total, baseline, anomalies, score\n| extend timestamp = AnomalyTime, AccountCustomEntity = SessionUserName , HostCustomEntity = Host, IPCustomEntity = SourceIPAddress\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Identifies when an anomalous spike occur in data transfer from an S3 bucket based on GetObject API call and the BytesTransferredOut field.\nThe query leverages KQL built-in anomaly detection algorithms to find large deviations from baseline "
+          },
+          {
+            "name": "tactics",
+            "value": "Exfiltration"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1020"
+          }
+        ]
+      }
+    }
+  ]
+}

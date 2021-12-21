@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/AddtionalOrgAdminAdded')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Azure DevOps- Addtional Org Admin added",
+        "category": "Hunting Queries",
+        "query": "AzureDevOpsAuditing\n| where OperationName == \"Group.UpdateGroupMembership.Add\"\n| where Category == \"Modify\"\n| where Area == \"Group\"\n| where Details contains (\"Project Collection Administrators\")\n| extend timestamp = TimeGenerated, AccountCustomEntity = ActorUPN, IPCustomEntity = IpAddress\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This hunting query identifies Azure DevOps activities where additional organization admin is added"
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence,DefenseEvasion"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1098,T1562"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/PortOpenedForAzureResource')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Port opened for an Azure Resource",
+        "category": "Hunting Queries",
+        "query": "\nAzureActivity\n| where OperationNameValue has_any (\"ipfilterrules\", \"securityRules\", \"publicIPAddresses\", \"firewallrules\") and OperationNameValue endswith \"write\"\n// Choosing Accepted here because it has the Rule Attributes included\n| where ActivityStatusValue == \"Accepted\" \n// If there is publicIP info, include it\n| extend publicIPAddress_ = tostring(parse_json(tostring(parse_json(tostring(parse_json(Properties).responseBody)).properties)).ipAddress) \n| extend publicIPAddressVersion_ = tostring(parse_json(tostring(parse_json(tostring(parse_json(Properties).responseBody)).properties)).publicIPAddressVersion) \n| extend publicIPAllocationMethod_ = tostring(parse_json(tostring(parse_json(tostring(parse_json(Properties).responseBody)).properties)).publicIPAllocationMethod) \n// Include rule attributes for context\n| extend access = tostring(parse_json(tostring(parse_json(tostring(parse_json(Properties).responseBody)).properties)).access) \n| extend description = tostring(parse_json(tostring(parse_json(tostring(parse_json(Properties).responseBody)).properties)).description) \n| extend destinationPortRange = tostring(parse_json(tostring(parse_json(tostring(parse_json(Properties).responseBody)).properties)).destinationPortRange) \n| extend direction = tostring(parse_json(tostring(parse_json(tostring(parse_json(Properties).responseBody)).properties)).direction) \n| extend protocol = tostring(parse_json(tostring(parse_json(tostring(parse_json(Properties).responseBody)).properties)).protocol) \n| extend sourcePortRange = tostring(parse_json(tostring(parse_json(tostring(parse_json(Properties).responseBody)).properties)).sourcePortRange) \n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), ResourceIds = makeset(ResourceId) by Caller, CallerIpAddress, Resource, ResourceGroup, \nActivityStatusValue, ActivitySubstatus, SubscriptionId, access, description, destinationPortRange, direction, protocol, sourcePortRange  \n| extend timestamp = StartTime, AccountCustomEntity = Caller, IPCustomEntity = CallerIpAddress\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Identifies what ports may have been opened for a given Azure Resource over the last 7 days"
+          },
+          {
+            "name": "tactics",
+            "value": "CommandAndControl,Impact"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1071,T1571,T1496"
+          }
+        ]
+      }
+    }
+  ]
+}

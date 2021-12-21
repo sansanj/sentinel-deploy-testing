@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/new_adminaccountactivity')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "New Admin account activity seen which was not seen historically",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = starttime - 14d;\nlet historicalActivity=\nOfficeActivity\n| where TimeGenerated between(lookback..starttime)\n| where RecordType==\"ExchangeAdmin\" and UserType in (\"Admin\",\"DcAdmin\")\n| summarize historicalCount=count() by UserId;\nlet recentActivity = OfficeActivity\n| where TimeGenerated between(starttime..endtime)\n| where UserType in (\"Admin\",\"DcAdmin\")\n| summarize recentCount=count() by UserId;\nrecentActivity | join kind = leftanti (\n   historicalActivity\n) on UserId\n| project UserId,recentCount\n| order by recentCount asc, UserId\n| join kind = rightsemi\n(OfficeActivity\n| where TimeGenerated between(starttime..endtime)\n| where RecordType == \"ExchangeAdmin\" | where UserType in (\"Admin\",\"DcAdmin\"))\non UserId\n| summarize StartTime = max(TimeGenerated), EndTime = min(TimeGenerated), count() by RecordType, Operation, UserType, UserId, OriginatingServer, ResultStatus\n| extend timestamp = StartTime, AccountCustomEntity = UserId\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This will help you discover any new admin account activity which was seen and were not seen historically.\nAny new accounts seen in the results can be validated and investigated for any suspicious activities."
+          },
+          {
+            "name": "tactics",
+            "value": "PrivilegeEscalation,Collection"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1078,T1114"
+          }
+        ]
+      }
+    }
+  ]
+}

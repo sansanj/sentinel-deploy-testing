@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/GroupAddedToPrivlegeGroup')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Group added to Built in Domain Local or Global Group",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = starttime - 7d;\n// For AD SID mappings - https://docs.microsoft.com/windows/security/identity-protection/access-control/active-directory-security-groups\nlet WellKnownLocalSID = \"S-1-5-32-5[0-9][0-9]$\";\n// The SIDs for DnsAdmins and DnsUpdateProxy can be different than *-1102 and -*1103. Check these SIDs in your domain before running the query\nlet WellKnownGroupSID = \"S-1-5-21-[0-9]*-[0-9]*-[0-9]*-5[0-9][0-9]$|S-1-5-21-[0-9]*-[0-9]*-[0-9]*-1102$|S-1-5-21-[0-9]*-[0-9]*-[0-9]*-1103$\";\nlet GroupAddition = SecurityEvent\n| where TimeGenerated between(lookback..starttime)\n// 4728 - A member was added to a security-enabled global group\n// 4732 - A member was added to a security-enabled local group\n// 4756 - A member was added to a security-enabled universal group\n| where EventID in (\"4728\", \"4732\", \"4756\")\n| where AccountType == \"User\" and MemberName == \"-\"\n// Exclude Remote Desktop Users group: S-1-5-32-555\n| where TargetSid !in (\"S-1-5-32-555\")\n| where TargetSid matches regex WellKnownLocalSID or TargetSid matches regex WellKnownGroupSID\n| project GroupAddTime = TimeGenerated, GroupAddEventID = EventID, GroupAddActivity = Activity, GroupAddComputer = Computer,\nGroupAddTargetUserName = TargetUserName, GroupAddTargetDomainName = TargetDomainName, GroupAddTargetSid = TargetSid,\nGroupAddSubjectUserName = SubjectUserName, GroupAddSubjectUserSid = SubjectUserSid, GroupSid = MemberSid, Account, Computer\n| extend AccountCustomEntity = Account, HostCustomEntity = Computer;\nlet GroupCreated = SecurityEvent\n| where TimeGenerated between(starttime..endtime)\n// 4727 - A security-enabled global group was created\n// 4731 - A security-enabled local group was created\n// 4754 - A security-enabled universal group was created\n| where EventID in (\"4727\", \"4731\", \"4754\")\n| where AccountType == \"User\"\n| project GroupCreateTime = TimeGenerated, GroupCreateEventID = EventID, GroupCreateActivity = Activity, GroupCreateComputer = Computer,\nGroupCreateTargetUserName = TargetUserName, GroupCreateTargetDomainName = TargetDomainName, GroupCreateSubjectUserName = SubjectUserName,\nGroupCreateSubjectDomainName = SubjectDomainName, GroupCreateSubjectUserSid = SubjectUserSid, GroupSid = TargetSid, Account, Computer;\nGroupCreated\n| join (\nGroupAddition\n) on GroupSid\n| extend timestamp = GroupCreateTime, AccountCustomEntity = Account, HostCustomEntity = Computer\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "A Group created in the last 7 days was added to a privileged built in domain local group or global group such as the\nEnterprise Admins, Cert Publishers or DnsAdmins.  Be sure to verify this is an expected addition"
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence,PrivilegeEscalation"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1098,T1078"
+          }
+        ]
+      }
+    }
+  ]
+}

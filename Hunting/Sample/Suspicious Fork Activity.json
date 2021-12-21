@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/SuspiciousForkActivity')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "GitHub OAuth App Restrictions Disabled",
+        "category": "Hunting Queries",
+        "query": "\nlet CollaboratorsUserToRepoMapping = (\nGitHubRepo\n| where Action == \"Collaborators\"\n| distinct Repository , Actor, Organization);\nlet UserCommitsInRepoMapping = (\nGitHubRepo\n| where Action == \"Commits\"\n| distinct  Repository ,Actor, Organization);\nunion CollaboratorsUserToRepoMapping, UserCommitsInRepoMapping\n| summarize ContributedToRepos = make_set(Repository) by Actor, Organization\n| join kind=innerunique (\nGitHubRepo\n| where Action == \"Forks\"\n| distinct Repository , Actor, Organization\n) on Actor, Organization\n| project-away Actor1, Organization1\n| where ContributedToRepos !contains Repository\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This hunting query identifies a fork activity against a repository done by a user who is not the owner of the repo nor a contributes."
+          },
+          {
+            "name": "tactics",
+            "value": "Exfiltration"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1537"
+          }
+        ]
+      }
+    }
+  ]
+}

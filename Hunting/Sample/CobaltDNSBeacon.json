@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/CobaltDNSBeacon')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Cobalt Strike DNS Beaconing",
+        "category": "Hunting Queries",
+        "query": "\nlet badNames = dynamic([\"aaa.stage.\", \"post.1\"]);\n(union isfuzzy=true\n(DnsEvents \n| where Name has_any (badNames)\n| extend Domain = Name, SourceIp = ClientIP, RemoteIP = todynamic(IPAddresses)\n| mvexpand RemoteIP\n| extend RemoteIP = tostring(RemoteIP)),\n(VMConnection\n| where isnotempty(RemoteDnsCanonicalNames) \n| parse RemoteDnsCanonicalNames with * '[\"' DNSName '\"]' *\n| where DNSName has_any (badNames)\n| extend Domain = DNSName, RemoteIP = RemoteIp\n))\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated) by Domain, SourceIp, RemoteIP, Computer\n| extend timestamp = StartTimeUtc, HostCustomEntity = Computer, IPCustomEntity = RemoteIP\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Cobalt Strike is a famous Pen Test tool that is used by pen testers as well as attackers alike To compromise an environment. \nThe query tries to detect suspicious DNS queries known from Cobalt Strike beacons.\nThis is based out of sigma rule"
+          },
+          {
+            "name": "tactics",
+            "value": "CommandAndControl"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1568,T1008"
+          }
+        ]
+      }
+    }
+  ]
+}

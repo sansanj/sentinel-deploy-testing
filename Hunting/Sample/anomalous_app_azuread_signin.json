@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/anomalous_app_azuread_signin')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Anomalous Azure Active Directory apps based on authentication location",
+        "category": "Hunting Queries",
+        "query": "\nlet azureSignIns = \nSigninLogs\n| where SourceSystem == \"Azure AD\"\n| where OperationName == \"Sign-in activity\"\n| project TimeGenerated, OperationName, AppDisplayName , Identity, UserId, UserPrincipalName, Location, LocationDetails, \nClientAppUsed, DeviceDetail, ConditionalAccessPolicies;\nazureSignIns\n| extend locationString = strcat(tostring(LocationDetails[\"countryOrRegion\"]), \"/\", \ntostring(LocationDetails[\"state\"]), \"/\", tostring(LocationDetails[\"city\"]), \";\" , tostring(LocationDetails[\"geoCoordinates\"]))\n| summarize rawSigninCount = count(), countByAccount = dcount(UserId), locationCount = dcount(locationString) by AppDisplayName\n// tail - pick a threshold to rule out the very-high volume Azure AD apps\n| where rawSigninCount < 1000\n// more locations than accounts\n| where locationCount>countByAccount\n// almost as many / more locations than sign-ins!\n| where 1.0*rawSigninCount / locationCount > 0.8 \n| order by rawSigninCount  desc\n| join kind = leftouter (\n   azureSignIns \n) on AppDisplayName \n| project AppDisplayName, TimeGenerated , Identity, rawSigninCount, countByAccount, locationCount,  \nlocationString = strcat(tostring(LocationDetails[\"countryOrRegion\"]), \"/\", tostring(LocationDetails[\"state\"]), \"/\", \ntostring(LocationDetails[\"city\"]), \";\" , tostring(LocationDetails[\"geoCoordinates\"])), UserPrincipalName\n| extend timestamp = TimeGenerated, AccountCustomEntity = UserPrincipalName \n| order by AppDisplayName, TimeGenerated desc\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This query over Azure AD sign-in activity highlights Azure AD apps with \nan unusually high ratio of distinct geolocations versus total number of authentications"
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1078"
+          }
+        ]
+      }
+    }
+  ]
+}

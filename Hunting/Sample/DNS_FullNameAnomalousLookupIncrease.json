@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/DNS_FullNameAnomalousLookupIncrease')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "DNS Full Name anomalous lookup increase",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = starttime - 7d;\n//example of excluding Saturday and Sunday in Average as those are potentially low volume and decrease the average, feel free to change\nlet excludedDays = dynamic([\"Saturday\", \"Sunday\"]);\n// average is across 5 days as we are dropping weekends, change as needed\nlet numDays = 5;\n// limit to over 1000 lookups somewhat random but helps focus in on higher lookups, change as needed\nlet avglookupThreshold = 3;\nlet lookupThreshold = 1000;\nDnsEvents\n//Setting to startofday so we get 7 days prior to today\n| where TimeGenerated >= startofday(lookback) and TimeGenerated <= startofday(starttime)\n| where SubType =~ \"LookupQuery\"\n//getting the associated number of the day of the week so we can map to a given day for later parsing if needed\n| extend DayNumberofWeek = tostring(dayofweek(TimeGenerated))\n//Setting the Day of the week value so that certain days could be excluded if needed\n| extend DayofWeek = iff(DayNumberofWeek == \"00:00:00\", \"Sunday\",\n(iff(DayNumberofWeek == \"1.00:00:00\", \"Monday\",\n(iff(DayNumberofWeek == \"2.00:00:00\", \"Tuesday\",\n(iff(DayNumberofWeek == \"3.00:00:00\", \"Wednesday\",\n(iff(DayNumberofWeek == \"4.00:00:00\", \"Thursday\",\n(iff(DayNumberofWeek == \"5.00:00:00\", \"Friday\",\n(iff(DayNumberofWeek == \"6.00:00:00\", \"Saturday\", DayNumberofWeek)))))))))))))\n| where DayofWeek !in~ (excludedDays)\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), count() by ClientIP, Name, IPAddresses\n| project StartTime, EndTime, ClientIP, FullNameLookup = Name, IPAddresses, DailyAvgLookupCountOverLastWeek = count_/numDays\n| join ( DnsEvents\n| where TimeGenerated between(startofday(starttime)..endofday(endtime))\n| where SubType =~ \"LookupQuery\"\n| summarize count() by ClientIP, FullNameLookup = Name, IPAddresses\n| project ClientIP, LookupCountToday = count_, FullNameLookup, IPAddresses\n)\non ClientIP, FullNameLookup, IPAddresses\n| where LookupCountToday > (DailyAvgLookupCountOverLastWeek * avglookupThreshold) and LookupCountToday >= lookupThreshold\n| project StartTime, EndTime, ClientIP, LookupCountToday, DailyAvgLookupCountOverLastWeek, FullNameLookup, IPAddresses\n| order by LookupCountToday desc nulls last\n| extend timestamp = StartTime, IPCustomEntity = ClientIP\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Checking for a threefold increase or more of Full Name lookup per Client IP for the current day for today vs the daily average for the previous week.\nThis can potentially identify excessive traffic to a given location that could be indicati"
+          },
+          {
+            "name": "tactics",
+            "value": "CommandAndControl,Exfiltration"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1568,T1008,T1048"
+          }
+        ]
+      }
+    }
+  ]
+}

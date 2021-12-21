@@ -1,0 +1,49 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    },
+    "formattedTimeNow": {
+      "type": "string",
+      "defaultValue": "[utcNow('g')]",
+      "metadata": {
+        "description": "Appended to workbook displayNames to make them unique"
+      }
+    },
+    "workbook-id": {
+      "type": "string",
+      "defaultValue": "99617617-f906-4241-9c03-d8ca7aec78c3",
+      "minLength": 1,
+      "metadata": {
+        "description": "Unique id for the workbook"
+      }
+    },
+    "workbook-name": {
+      "type": "string",
+      "defaultValue": "ForcepointNGFW",
+      "minLength": 1,
+      "metadata": {
+        "description": "Name for the workbook"
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Insights/workbooks",
+      "name": "[parameters('workbook-id')]",
+      "location": "[resourceGroup().location]",
+      "kind": "shared",
+      "apiVersion": "2020-02-12",
+      "properties": {
+        "displayName": "[concat(parameters('workbook-name'), ' - ', parameters('formattedTimeNow'))]",
+        "serializedData": "{\"version\":\"Notebook/1.0\",\"items\":[{\"type\":1,\"content\":{\"json\":\"# Log results grouped by Activity type\"},\"name\":\"text - 7\"},{\"type\":3,\"content\":{\"version\":\"KqlItem/1.0\",\"query\":\"CommonSecurityLog \\n| where DeviceVendor == \\\"Forcepoint\\\" and DeviceProduct == \\\"NGFW\\\" and TimeGenerated <= now()\\n| summarize Count= count() by Activity\\n| render barchart\",\"size\":1,\"timeContext\":{\"durationMs\":2592000000},\"queryType\":0,\"resourceType\":\"microsoft.operationalinsights/workspaces\",\"chartSettings\":{\"xAxis\":\"Activity\",\"group\":\"Count\",\"createOtherGroup\":0,\"showLegend\":true}},\"name\":\"query - 2\"},{\"type\":1,\"content\":{\"json\":\"# Number of log results grouped by severity\"},\"name\":\"text - 6\"},{\"type\":3,\"content\":{\"version\":\"KqlItem/1.0\",\"query\":\"CommonSecurityLog \\n| where DeviceVendor == \\\"Forcepoint\\\" and DeviceProduct == \\\"NGFW\\\" and TimeGenerated <= now()\\n| summarize Count= count() by LogSeverity\\n| render barchart\",\"size\":0,\"timeContext\":{\"durationMs\":2592000000},\"queryType\":0,\"resourceType\":\"microsoft.operationalinsights/workspaces\",\"chartSettings\":{\"group\":\"Count\",\"createOtherGroup\":0,\"showMetrics\":false,\"showLegend\":true}},\"name\":\"query - 5\"},{\"type\":1,\"content\":{\"json\":\"# Log results grouped by Source IP address\"},\"name\":\"text - 8\"},{\"type\":3,\"content\":{\"version\":\"KqlItem/1.0\",\"query\":\"CommonSecurityLog \\n| where DeviceVendor == \\\"Forcepoint\\\" and DeviceProduct == \\\"NGFW\\\" and TimeGenerated <= now()\\n| summarize Count= count() by SourceIP\\n| render barchart\",\"size\":0,\"timeContext\":{\"durationMs\":2592000000},\"queryType\":0,\"resourceType\":\"microsoft.operationalinsights/workspaces\"},\"name\":\"query - 2\"},{\"type\":3,\"content\":{\"version\":\"KqlItem/1.0\",\"query\":\"CommonSecurityLog| where DeviceVendor == \\\"Forcepoint\\\" and DeviceProduct == \\\"NGFW\\\" and DeviceAction  == 'Terminate' and TimeGenerated <= now()\",\"size\":0,\"timeContext\":{\"durationMs\":2592000000},\"queryType\":0,\"resourceType\":\"microsoft.operationalinsights/workspaces\"},\"name\":\"query - 3\"},{\"type\":3,\"content\":{\"version\":\"KqlItem/1.0\",\"query\":\"CommonSecurityLog| where DeviceVendor == \\\"Forcepoint\\\" and DeviceProduct == \\\"NGFW\\\" and LogSeverity  == '10' and TimeGenerated <= now()\",\"size\":0,\"timeContext\":{\"durationMs\":6566400000,\"endTime\":\"2020-01-16T13:46:00Z\"},\"queryType\":0,\"resourceType\":\"microsoft.operationalinsights/workspaces\"},\"name\":\"query - 4\"}],\"fromTemplateId\":\"sentinel-UserWorkbook\",\"$schema\":\"https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json\"}\r\n",
+        "version": "1.0",
+        "sourceId": "[concat(resourceGroup().id, '/providers/Microsoft.OperationalInsights/workspaces/',parameters('workspace'))]",
+        "category": "sentinel",
+        "etag": "*"
+      }
+    }
+  ]
+}

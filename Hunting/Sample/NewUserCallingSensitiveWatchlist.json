@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/NewUserCallingSensitiveWatchlist')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "New users calling sensitive Watchlist",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = starttime - 14d;\nLAQueryLogs\n| where TimeGenerated between(lookback..starttime)\n| where QueryText has_any ('_GetWatchlist(\"VIPUsers\")', \"_GetWatchlist('VIPUsers')\", '_GetWatchlist(\"ServiceAccounts\")', \"_GetWatchlist('ServiceAccounts')\",'_GetWatchlist(\"HighValueAssets\")', \"_GetWatchlist('HighValueAssets')\")\n| summarize by AADEmail\n| join kind = rightanti (LAQueryLogs\n| where TimeGenerated between(starttime..endtime)\n| where QueryText has_any ('_GetWatchlist(\"VIPUsers\")', \"_GetWatchlist('VIPUsers')\", '_GetWatchlist(\"ServiceAccounts\")', \"_GetWatchlist('ServiceAccounts')\",'_GetWatchlist(\"HighValueAssets\")', \"_GetWatchlist('HighValueAssets')\"))\non AADEmail\n| project TimeGenerated, AADEmail, QueryText, RequestClientApp, RequestTarget\n| extend timestamp = TimeGenerated, AccountCustomEntity = AADEmail\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This hunting query looks for users who have run queries calling a watchlist template relating to sensitive data that have not previously been seen calling these watchlists."
+          },
+          {
+            "name": "tactics",
+            "value": "Collection"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1530,T1213"
+          }
+        ]
+      }
+    }
+  ]
+}

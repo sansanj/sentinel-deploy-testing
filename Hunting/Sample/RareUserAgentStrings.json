@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/RareUserAgentStrings')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Rare User Agent strings",
+        "category": "Hunting Queries",
+        "query": "\nW3CIISLog\n// The below line can be used to exclude local IPs if these create noise\n//| where cIP !startswith \"192.168.\" and cIP != \"::1\"\n| where isnotempty(csUserAgent) and csUserAgent !in~ (\"-\", \"MSRPC\")\n| extend csUserAgent_size = string_size(csUserAgent)\n| project TimeGenerated, sSiteName, sPort, csUserAgent, csUserAgent_size, csUserName , csMethod, csUriStem, sIP, cIP, scStatus, \nscSubStatus, scWin32Status, csHost \n| join (\n    W3CIISLog\n\t  // The below line can be used to exclude local IPs if these create noise\n    //| where cIP !startswith \"192.168.\" and cIP != \"::1\"\n    | where isnotempty(csUserAgent) and csUserAgent !in~ (\"-\", \"MSRPC\") \n    | extend csUserAgent_size = string_size(csUserAgent)\n    | summarize csUserAgent_count = count() by bin(csUserAgent_size, 1)\n    | top 20 by csUserAgent_count asc nulls last \n) on csUserAgent_size\n| project TimeGenerated, sSiteName, sPort, sIP, cIP, csUserAgent, csUserAgent_size, csUserAgent_count, csUserName , csMethod, csUriStem, \nscStatus, scSubStatus, scWin32Status, csHost\n| extend timestamp = TimeGenerated, IPCustomEntity = cIP, HostCustomEntity = csHost, AccountCustomEntity = csUserName \n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This will check for Rare User Agent strings over the last 3 days.  This can indicate potential probing of your IIS servers."
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1190"
+          }
+        ]
+      }
+    }
+  ]
+}

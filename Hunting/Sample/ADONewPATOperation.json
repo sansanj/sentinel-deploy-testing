@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/ADONewPATOperation')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Azure DevOps - New PAT Operation",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = totimespan((endtime-starttime)*10);\nlet PAT_Actions = AzureDevOpsAuditing\n| where TimeGenerated > ago(lookback) and TimeGenerated < starttime\n| where AuthenticationMechanism startswith \"PAT\"\n| summarize by OperationName;\nAzureDevOpsAuditing\n| where TimeGenerated between(starttime..endtime)\n| where AuthenticationMechanism startswith \"PAT\"\n| where OperationName !in (PAT_Actions)\n| extend timestamp = TimeGenerated, AccountCustomEntity = ActorUPN, IPCustomEntity = IpAddress\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "PATs are typically used for repeated, programmatic tasks. This query looks for PATs based authentication being used with an Operation not previous associated with PAT based authentication. This could indicate an attacker using a stolen PAT "
+          },
+          {
+            "name": "tactics",
+            "value": "DefenseEvasion"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1078"
+          }
+        ]
+      }
+    }
+  ]
+}

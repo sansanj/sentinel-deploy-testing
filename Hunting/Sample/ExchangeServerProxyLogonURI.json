@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/ExchangeServerProxyLogonURI')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Exchange Server ProxyLogon URIs",
+        "category": "Hunting Queries",
+        "query": "\nW3CIISLog\n| where not(ipv4_is_private(cIP))\n| where (csUriStem matches regex @\"\\/owa\\/auth\\/[A-Za-z0-9]{1,30}\\.js\") or (csUriStem matches regex @\"\\/ecp\\/[A-Za-z0-9]{1,30}\\.(js|flt|css)\")\n| project TimeGenerated, sSiteName, csMethod, csUriStem, sPort, sIP, cIP, csUserAgent\n| extend timestamp = TimeGenerated\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This query will detect paths suspicious associated with ProxyLogon exploitation"
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1190"
+          }
+        ]
+      }
+    }
+  ]
+}

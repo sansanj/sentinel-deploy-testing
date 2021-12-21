@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/imProcess_PowerCatDownload')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Powercat Download (Normalized Process Events)",
+        "category": "Hunting Queries",
+        "query": "imProcessCreate\n| where Process has_any (\"cmd.exe\", \"powershell.exe\", \"PowerShell_ISE.exe\")\n| where CommandLine hassuffix \"powercat.ps1\"\n| extend timestamp = TimeGenerated, AccountCustomEntity = User, HostCustomEntity = Dvc\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Powercat is a PowerShell implementation of netcat. Whilst it can be used as a legitimate administrative tool it can be abused by attackers to exfiltrate data. This query looks for command line activity downloading PowerCat."
+          },
+          {
+            "name": "tactics",
+            "value": "Exfiltration"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1011"
+          }
+        ]
+      }
+    }
+  ]
+}

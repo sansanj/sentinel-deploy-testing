@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/WindowsSystemTimeChange')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Windows System Time changed on hosts",
+        "category": "Hunting Queries",
+        "query": "\nSecurityEvent\n| where EventID == 4616\n| where not(ProcessName has_any (\":\\\\Windows\\\\System32\\\\svchost.exe\", \":\\\\Program Files\\\\VMware\\\\VMware Tools\\\\vmtoolsd.exe\"))\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), count() by Computer, EventID, Activity, Account, AccountType, NewTime, PreviousTime, ProcessName, ProcessId, SubjectAccount, SubjectUserSid, SourceComputerId, _ResourceId\n| extend timestamp = StartTime, HostCustomEntity = Computer, AccountCustomEntity = SubjectAccount\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Identifies when the system time was changed on a Windows host which can indicate potential timestomping activities.\nReference: Event ID 4616 is only available when the full event collection is enabled - https://docs.microsoft.com/azure/sent"
+          },
+          {
+            "name": "tactics",
+            "value": "DefenseEvasion"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1070"
+          }
+        ]
+      }
+    }
+  ]
+}

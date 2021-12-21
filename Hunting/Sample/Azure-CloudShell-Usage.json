@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/Azure-CloudShell-Usage')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Azure CloudShell Usage",
+        "category": "Hunting Queries",
+        "query": "\nAzureActivity\n   | where ActivityStatusValue == \"Succeeded\"\n   | where ResourceGroup has \"cloud-shell-storage\"\n   | where OperationNameValue == \"Microsoft.Storage/storageAccounts/listKeys/action\"\n   // Change the timekey scope below to get activity for a longer window \n   | summarize by Caller, timekey= bin(TimeGenerated, 1h)\n   | join (AzureActivity | where TimeGenerated >= ago(1d)\n   | where OperationNameValue != \"Microsoft.Storage/storageAccounts/listKeys/action\"\n   | where isnotempty(OperationName)\n    // Change the timekey scope below to get activity for a longer window \n   | summarize make_set(OperationName) by Caller, timekey=bin(TimeGenerated, 1h)) on Caller, timekey\n   | extend timestamp = timekey, AccountCustomEntity = Caller\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This query look for users starting an Azure CloudShell session and summarizes the Azure Activity from that\nuser account during that timeframe (by default 1 hour). This can be used to help identify abuse of the CloudShell\nto modify Azure res"
+          },
+          {
+            "name": "tactics",
+            "value": "Execution"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1059"
+          }
+        ]
+      }
+    }
+  ]
+}

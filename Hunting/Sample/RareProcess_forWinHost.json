@@ -1,0 +1,34 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/RareProcess_forWinHost')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Hosts running a rare process",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = starttime - 30d;\nlet basic=materialize(\n  SecurityEvent\n    | where TimeGenerated between(lookback..endtime)\n    | where EventID == 4688\n    | summarize FullCount = count()\n                , Count= countif(TimeGenerated between (starttime .. endtime))\n                , min_TimeGenerated=min(TimeGenerated)\n                , max_TimeGenerated=max(TimeGenerated)\n                      by Computer, NewProcessName\n    | where Count > 0 and Count < 100);\nlet basic_avg = basic\n    | summarize Avg = avg(FullCount) by  NewProcessName;\nbasic | project-away FullCount\n  | join kind=inner\nbasic_avg\n  on NewProcessName | project-away NewProcessName1\n  | where Count < 14 or (Count <= Avg*0.01 and Count < 100)\n  | extend HostCustomEntity=Computer\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "ooking for hosts running a rare process. Less than 1% of the average for 30 days and less than a count of 100 on a given host or less than a 14 count on a given host from the last 7 day"
+          },
+          {
+            "name": "tactics",
+            "value": "Execution,Persistence,Discovery,LateralMovement,Collection"
+          }
+        ]
+      }
+    }
+  ]
+}

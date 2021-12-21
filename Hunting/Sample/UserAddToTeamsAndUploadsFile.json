@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/UserAddToTeamsAndUploadsFile')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "User added to Team and immediately uploads file",
+        "category": "Hunting Queries",
+        "query": "\nlet threshold = 1m;\nOfficeActivity\n| where OfficeWorkload =~ \"MicrosoftTeams\"\n| where Operation == \"MemberAdded\"\n| extend TeamName = iff(isempty(TeamName), Members[0].UPN, TeamName)\n| project TimeGenerated, UploaderID=UserId, TeamName\n| join (\n  OfficeActivity\n  | where RecordType == \"SharePointFileOperation\"\n  | where SourceRelativeUrl has \"Microsoft Teams Chat Files\"\n  | where Operation == \"FileUploaded\"\n  | project UploadTime=TimeGenerated, UploaderID=UserId, FileLocation=OfficeObjectId, FileName=SourceFileName\n  ) on UploaderID\n| where UploadTime > TimeGenerated and UploadTime < TimeGenerated+threshold\n| project-away UploaderID1\n| extend timestamp=TimeGenerated, AccountCustomEntity = UploaderID \n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This hunting queries identifies users who are added to a Team or Teams chat\nand within 1 minute of being added upload a file via the chat. This might be\nan indicator of suspicious activity."
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1566"
+          }
+        ]
+      }
+    }
+  ]
+}

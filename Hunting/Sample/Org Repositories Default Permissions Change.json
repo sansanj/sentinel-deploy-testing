@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/OrgRepositoriesDefaultPermissionsChange')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "GitHub Update Permissions",
+        "category": "Hunting Queries",
+        "query": "\nGitHubAudit\n| where Action == \"org.update_default_repository_permission\"\n| project TimeGenerated, Action, Actor, Country, Repository, PreviousPermission, CurrentPermission\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This hunting query identifies GitHub activites where permissions are updated that may be a sign of compromise."
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence,DefenseEvasion"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1098,T1562"
+          }
+        ]
+      }
+    }
+  ]
+}

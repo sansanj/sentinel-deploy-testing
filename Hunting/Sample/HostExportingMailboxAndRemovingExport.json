@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/HostExportingMailboxAndRemovingExport')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Host Exporting Mailbox and Removing Export",
+        "category": "Hunting Queries",
+        "query": "\n// Adjust the timeframe to change the window events need to occur within to alert\nlet timeframe = 1h;\nSecurityEvent\n| where EventID == 4688\n| where Process in~ (\"powershell.exe\", \"cmd.exe\")\n| where CommandLine contains 'New-MailboxExportRequest'\n| summarize by Computer, timekey = bin(TimeGenerated, timeframe), CommandLine, SubjectUserName\n| join kind=inner (SecurityEvent\n| where EventID == 4688\n| where Process in~ (\"powershell.exe\", \"cmd.exe\")\n| where CommandLine contains 'Remove-MailboxExportRequest'\n| summarize by Computer, timekey = bin(TimeGenerated, timeframe), CommandLine, SubjectUserName) on Computer, timekey, SubjectUserName\n| extend commands = pack_array(CommandLine1, CommandLine)\n| summarize by timekey, Computer, tostring(commands), SubjectUserName\n| project-reorder timekey, Computer, SubjectUserName, ['commands']\n| extend HostCustomEntity = Computer, AccountCustomEntity = SubjectUserName\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This hunting query looks for hosts exporting a mailbox from an on-prem Exchange server, followed by\nthat same host removing the export within a short time window. This pattern has been observed by attackers \nwhen exfiltrating emails from a "
+          },
+          {
+            "name": "tactics",
+            "value": "Collection"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1114"
+          }
+        ]
+      }
+    }
+  ]
+}

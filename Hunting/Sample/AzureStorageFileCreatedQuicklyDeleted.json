@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/AzureStorageFileCreatedQuicklyDeleted')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Azure Storage File Create and Delete",
+        "category": "Hunting Queries",
+        "query": "\nlet threshold = 5m;\nlet StorageData =\nunion\nStorageFileLogs,\nStorageBlobLogs;\nStorageData\n| where StatusText =~ \"Success\"\n| where OperationName =~ \"PutBlob\" or OperationName =~ \"PutRange\"\n| extend Uri = tostring(split(Uri, \"?\", 0)[0])\n| join (\n    StorageData\n    | where StatusText =~ \"Success\"\n    | where OperationName =~ \"DeleteBlob\" or OperationName =~ \"DeleteFile\"\n    | extend Uri = tostring(split(Uri, \"?\", 0)[0])\n    | project OperationName, DeletedTime=TimeGenerated, Uri\n) on Uri\n| project TimeGenerated, DeletedTime, Uri, CallerIpAddress, UserAgentHeader, ResponseMd5, StorageAccount=AccountName\n| extend windowEnd = TimeGenerated+5m \n| where DeletedTime between (TimeGenerated .. windowEnd)\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This hunting query will try to identify instances where a file us uploaded to file storage and then deleted\nwithin a given threshold. By default the query will find instances where a file is uploaded and deleted within\n5 minutes. This hunti"
+          },
+          {
+            "name": "tactics",
+            "value": "Exfiltration"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1020,T1537"
+          }
+        ]
+      }
+    }
+  ]
+}

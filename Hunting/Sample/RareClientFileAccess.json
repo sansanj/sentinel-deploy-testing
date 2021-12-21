@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/RareClientFileAccess')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "URI requests from single client",
+        "category": "Hunting Queries",
+        "query": "\n\nlet clientThreshold = 1;\nlet scriptExtensions = dynamic([\".php\", \".aspx\", \".asp\", \".cfml\"]);\nlet data = W3CIISLog\n| where csUriStem has_any(scriptExtensions)\n//Exclude local addresses, needs editing to match your network configuration\n| where cIP !startswith \"10.\" and cIP !startswith \"fe80\" and cIP !startswith \"::\" and cIP !startswith \"127.\" and cIP !startswith \"172.\"\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), makelist(cIP), count(TimeGenerated) by csUriStem, sSiteName, csUserAgent;\ndata\n| mvexpand list_cIP\n| distinct StartTime, EndTime, tostring(list_cIP), csUriStem, sSiteName, csUserAgent\n| summarize StartTime = min(StartTime), EndTime = max(StartTime), dcount(list_cIP), makelist(list_cIP), makelist(sSiteName) by csUriStem, csUserAgent\n| where dcount_list_cIP == clientThreshold \n//Selects user agent strings that are probably browsers, comment out to see all\n| where csUserAgent startswith \"Mozilla\"\n| extend timestamp = StartTime\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This will look for connections to files on the server that are requested by only a single client. \nThis analytic will be effective where an actor is utilising relatively static operational IP addresses. The threshold can be modified. \nThe l"
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1190"
+          }
+        ]
+      }
+    }
+  ]
+}

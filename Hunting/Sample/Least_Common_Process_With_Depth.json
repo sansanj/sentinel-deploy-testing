@@ -1,0 +1,34 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/Least_Common_Process_With_Depth')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Least Common Processes Including Folder Depth",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = starttime - 7d;\nlet Allowlist = dynamic (['foo.exe', 'baz.exe']);\nlet Sensitivity = 15;\nSecurityEvent\n| where TimeGenerated between(lookback..endtime)\n| where EventID == 4688\n| extend ProcArray = split(NewProcessName, '\\\\')\n// ProcArrayLength is Folder Depth\n| extend ProcArrayLength = arraylength(ProcArray)\n| extend LastIndex = ProcArrayLength - 1\n| extend Proc = ProcArray[LastIndex]\n| where Proc !in (Allowlist)\n// ProcArray[0] is the proc's Drive\n| extend DriveDepthProc = strcat(ProcArray[0], '-', ProcArrayLength, '-', Proc)\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), TimesSeen = count(), HostCount = dcount(Computer), Hosts = makeset(Computer), UserCount = dcount(SubjectUserName), Users = makeset(SubjectUserName) by DriveDepthProc\n| where TimesSeen < Sensitivity\n| extend timestamp = StartTimeUtc\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Looks across your environment for least common Process Command Lines, may be noisy and require allowlisting.  By ZanCo"
+          },
+          {
+            "name": "tactics",
+            "value": "Execution"
+          }
+        ]
+      }
+    }
+  ]
+}

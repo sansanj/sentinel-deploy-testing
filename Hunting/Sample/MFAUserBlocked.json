@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/MFAUserBlocked')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Login attempt by Blocked MFA user",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = starttime - 7d;\nlet isGUID = \"[0-9a-z]{8}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12}\";\nlet MFABlocked = SigninLogs\n| where TimeGenerated between(starttime..endtime)\n| where ResultType != \"0\"\n| extend StatusCode = tostring(Status.errorCode), StatusDetails = tostring(Status.additionalDetails), Status = strcat(ResultType, \": \", ResultDescription)\n| where StatusDetails =~ \"MFA denied; user is blocked\"\n| extend Unresolved = iff(Identity matches regex isGUID, true, false);\n// Lookup up resolved identities from last 7 days\nlet identityLookup = SigninLogs\n| where TimeGenerated between(lookback..starttime)\n| where not(Identity matches regex isGUID)\n| summarize by UserId, lu_UserDisplayName = UserDisplayName, lu_UserPrincipalName = UserPrincipalName;\n// Join resolved names to unresolved list from MFABlocked signins\nlet unresolvedNames = MFABlocked | where Unresolved == true | join kind= inner (\n identityLookup\n) on UserId\n| extend UserDisplayName = lu_UserDisplayName, UserPrincipalName = lu_UserPrincipalName\n| project-away lu_UserDisplayName, lu_UserPrincipalName;\n// Join Signins that had resolved names with list of unresolved that now have a resolved name\nlet u_MFABlocked = MFABlocked | where Unresolved == false | union unresolvedNames;\nu_MFABlocked\n| extend OS = tostring(DeviceDetail.operatingSystem), Browser = tostring(DeviceDetail.browser)\n| extend FullLocation = strcat(Location,'|', LocationDetails.state, '|', LocationDetails.city)\n| summarize TimeGenerated = makelist(TimeGenerated), Status = makelist(Status), IPAddresses = makelist(IPAddress), IPAddressCount = dcount(IPAddress),\n  AttemptCount = count() by UserPrincipalName, UserId, UserDisplayName, AppDisplayName, Browser, OS, FullLocation , CorrelationId\n| mvexpand TimeGenerated, IPAddresses, Status\n| extend TimeGenerated = todatetime(tostring(TimeGenerated)), IPAddress = tostring(IPAddresses), Status = tostring(Status)\n| project-away IPAddresses\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated) by UserPrincipalName, UserId, UserDisplayName, Status,  IPAddress, IPAddressCount, AppDisplayName, Browser, OS, FullLocation\n| extend timestamp = StartTime, AccountCustomEntity = UserPrincipalName, IPCustomEntity = IPAddress\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "An account could be blocked if there are too many failed authentication attempts in a row. This hunting query identifies if a MFA user account that is set to blocked tries to login to Azure AD."
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1078"
+          }
+        ]
+      }
+    }
+  ]
+}

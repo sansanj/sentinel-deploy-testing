@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/ExternalUserFromNewOrgAddedToTeams')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "External user from a new organisation added to Teams",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = totimespan((endtime-starttime)*7);\nlet known_orgs = (\nOfficeActivity\n| where TimeGenerated between(ago(lookback)..starttime)\n| where OfficeWorkload =~ \"MicrosoftTeams\"\n| where Operation =~ \"MemberAdded\" or Operation =~ \"TeamsSessionStarted\"\n// Extract the correct UPN and parse our external organization domain\n| extend UPN = iif(Operation == \"MemberAdded\", tostring(Members[0].UPN), UserId)\n| extend Organization = tostring(split(split(UPN, \"_\")[1], \"#\")[0])\n| where isnotempty(Organization)\n| summarize by Organization);\nOfficeActivity\n| where TimeGenerated between(starttime..endtime)\n| where OfficeWorkload =~ \"MicrosoftTeams\"\n| where Operation =~ \"MemberAdded\"\n| extend UPN = tostring(parse_json(Members)[0].UPN)\n| extend Organization = tostring(split(split(UPN, \"_\")[1], \"#\")[0])\n| where isnotempty(Organization)\n| where Organization !in (known_orgs)\n| extend timestamp = TimeGenerated, AccountCustomEntity = UPN\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This query identifies external users added to Teams where the user's domain is not one previously seen in Teams data."
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1136"
+          }
+        ]
+      }
+    }
+  ]
+}

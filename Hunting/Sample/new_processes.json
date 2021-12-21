@@ -1,0 +1,34 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/new_processes')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "New processes observed in last 24 hours",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = starttime - 14d;\nlet ProcessCreationEvents=() {\nlet processEvents=SecurityEvent\n| where TimeGenerated between(lookback..starttime)\n| where EventID==4688\n| project TimeGenerated, ComputerName=Computer,AccountName=SubjectUserName, AccountDomain=SubjectDomainName, FileName=tostring(split(NewProcessName, @'')[(-1)]), ProcessCommandLine = CommandLine, InitiatingProcessFileName=ParentProcessName,InitiatingProcessCommandLine='',InitiatingProcessParentFileName='';\nprocessEvents};\nProcessCreationEvents\n| where TimeGenerated between(starttime..endtime)\n| summarize HostCount=dcount(ComputerName) by tostring(FileName)\n| join kind=rightanti (\n    ProcessCreationEvents\n    | where TimeGenerated between(starttime..endtime)\n    | summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), Computers = makeset(ComputerName) , HostCount=dcount(ComputerName) by tostring(FileName)\n) on FileName\n| project StartTimeUtc, Computers, HostCount, FileName\n| extend timestamp = StartTimeUtc\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "These new processes could be benign new programs installed on hosts; however, especially in normally stable environments,\nthese new processes could provide an indication of an unauthorized/malicious binary that has been installed and run.\nR"
+          },
+          {
+            "name": "tactics",
+            "value": "Execution"
+          }
+        ]
+      }
+    }
+  ]
+}

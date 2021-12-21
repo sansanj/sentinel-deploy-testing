@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/DNS_WannaCry')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "DNS Domains linked to WannaCry ransomware campaign",
+        "category": "Hunting Queries",
+        "query": "\nlet badDomains = dynamic([\"agrdwrtj.us\", \"bctxawdt.us\", \"cokfqwjmferc.us\", \"cxbenjiikmhjcerbj.us\", \"depuisgef.us\", \"edoknehyvbl.us\", \n\"enyeikruptiukjorq.com\", \"frullndjtkojlu.us\", \"gcidpiuvamynj.us\", \"gxrytjoclpvv.us\", \"hanoluexjqcf.us\", \"iarirjjrnuornts.us\", \n\"ifbjoosjqhaeqjjwaerri.us\", \"iouenviwrc.us\", \"kuuelejkfwk.us\", \"lkbsxkitgxttgaobxu.us\", \"nnnlafqfnrbynwor.us\", \"ns768.com\", \n\"ofdwcjnko.us\", \"peuwdchnvn.us\", \"pvbeqjbqrslnkmashlsxb.us\", \"pxyhybnyv.us\", \"qkkftmpy.us\", \"rkhlkmpfpoqxmlqmkf.us\", \n\"ryitsfeogisr.us\", \"srwcjdfrtnhnjekjerl.us\", \"thstlufnunxaksr.us\", \"udrgtaxgdyv.us\", \"w5q7spejg96n.com\", \"xmqlcikldft.us\", \n\"yobvyjmjbsgdfqnh.us\", \"yrwgugricfklb.us\", \"ywpvqhlqnssecpdemq.us\"]);\nDnsEvents\n| where Name in~ (badDomains)\n| summarize StartTime = min(TimeGenerated), EndTime = max(TimeGenerated), count() by Computer, ClientIP, WannaCrypt_Related_Domain = Name\n| extend timestamp = StartTime, HostCustomEntity = Computer, IPCustomEntity = ClientIP\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Displays client DNS request for any of the known domains linked to WannaCry.\nThese results may indicate Wannacry/Wannacrypt ransomware infection.\nReference: Domain listing from https://pastebin.com/cRUii32E"
+          },
+          {
+            "name": "tactics",
+            "value": "Impact"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1496"
+          }
+        ]
+      }
+    }
+  ]
+}

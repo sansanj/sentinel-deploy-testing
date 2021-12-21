@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/NewChildProcessOfW3WP')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "New Child Process of W3WP.exe",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet lookback = starttime - 14d;\nlet known_procs = (\nSecurityEvent\n| where TimeGenerated between(lookback..starttime)\n| where EventID == 4688\n| where ParentProcessName hassuffix \"w3wp.exe\"\n| extend ProcessHost = strcat(Process, \"-\", Computer)\n| summarize by ProcessHost);\nSecurityEvent\n| where TimeGenerated between(starttime..endtime)\n| where EventID == 4688\n| where ParentProcessName hassuffix \"w3wp.exe\"\n| extend ProcessHost = strcat(Process, \"-\", Computer)\n| where ProcessHost !in (known_procs)\n| project-reorder TimeGenerated, Computer, NewProcessName, ParentProcessName, Account, NewProcessId\n| extend timestamp = TimeGenerated, HostCustomEntity = Computer, AccountCustomEntity = Account\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This Hunting Query looks for child processes of w3wp.exe that have not been seen as a child process on that host within the last 14 days.\nw3wp.exe running suspicious processes such as 'cmd.exe /c echo', 'certutil.exe', or 'powershell.exe' t"
+          },
+          {
+            "name": "tactics",
+            "value": "Execution"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1203"
+          }
+        ]
+      }
+    }
+  ]
+}

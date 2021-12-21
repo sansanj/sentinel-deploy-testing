@@ -1,0 +1,34 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/CustomUserList_FailedLogons')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "VIP account more than 6 failed logons in 10",
+        "category": "Hunting Queries",
+        "query": "\n// Create DataTable with your own values, example below shows dummy usernames and domain\nlet List = datatable(VIPUser:string, Domain:string)[\"Bob\", \"Domain\", \"joe\", \"domain\", \"MATT\", \"DOMAIN\", \"administrator\", \"\"];\nlet timeframe = 10m;\nList\n| project TargetUserName = tolower(VIPUser), TargetDomainName = toupper(Domain)\n| join kind= rightsemi ( \nSecurityEvent \n| where TimeGenerated > ago(2*timeframe) \n| where EventID == \"4625\"\n| where AccountType == \"User\"\n) on TargetUserName, TargetDomainName\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), FailedVIPLogons = count() by EventID, Activity, WorkstationName, Account, TargetAccount, TargetUserName, TargetDomainName, LogonType, LogonTypeName, LogonProcessName, Status, SubStatus\n| where FailedVIPLogons >= 6\n// map the most common ntstatus codes\n| extend StatusDesc = case(\nStatus =~ \"0x80090302\", \"SEC_E_UNSUPPORTED_FUNCTION\",\nStatus =~ \"0x80090308\", \"SEC_E_INVALID_TOKEN\",\nStatus =~ \"0x8009030E\", \"SEC_E_NO_CREDENTIALS\",\nStatus =~ \"0xC0000008\", \"STATUS_INVALID_HANDLE\",\nStatus =~ \"0xC0000017\", \"STATUS_NO_MEMORY\",\nStatus =~ \"0xC0000022\", \"STATUS_ACCESS_DENIED\",\nStatus =~ \"0xC0000034\", \"STATUS_OBJECT_NAME_NOT_FOUND\",\nStatus =~ \"0xC000005E\", \"STATUS_NO_LOGON_SERVERS\",\nStatus =~ \"0xC000006A\", \"STATUS_WRONG_PASSWORD\",\nStatus =~ \"0xC000006D\", \"STATUS_LOGON_FAILURE\",\nStatus =~ \"0xC000006E\", \"STATUS_ACCOUNT_RESTRICTION\",\nStatus =~ \"0xC0000073\", \"STATUS_NONE_MAPPED\",\nStatus =~ \"0xC00000FE\", \"STATUS_NO_SUCH_PACKAGE\",\nStatus =~ \"0xC000009A\", \"STATUS_INSUFFICIENT_RESOURCES\",\nStatus =~ \"0xC00000DC\", \"STATUS_INVALID_SERVER_STATE\",\nStatus =~ \"0xC0000106\", \"STATUS_NAME_TOO_LONG\",\nStatus =~ \"0xC000010B\", \"STATUS_INVALID_LOGON_TYPE\",\nStatus =~ \"0xC000015B\", \"STATUS_LOGON_TYPE_NOT_GRANTED\",\nStatus =~ \"0xC000018B\", \"STATUS_NO_TRUST_SAM_ACCOUNT\",\nStatus =~ \"0xC0000224\", \"STATUS_PASSWORD_MUST_CHANGE\",\nStatus =~ \"0xC0000234\", \"STATUS_ACCOUNT_LOCKED_OUT\",\nStatus =~ \"0xC00002EE\", \"STATUS_UNFINISHED_CONTEXT_DELETED\",\n\"See - https://docs.microsoft.com/openspecs/windows_protocols/ms-erref/596a1078-e883-4972-9bbc-49e60bebca55\"\n)\n| extend SubStatusDesc = case(\nSubStatus =~ \"0x80090325\", \"SEC_E_UNTRUSTED_ROOT\",\nSubStatus =~ \"0xC0000008\", \"STATUS_INVALID_HANDLE\",\nSubStatus =~ \"0xC0000022\", \"STATUS_ACCESS_DENIED\",\nSubStatus =~ \"0xC0000064\", \"STATUS_NO_SUCH_USER\",\nSubStatus =~ \"0xC000006A\", \"STATUS_WRONG_PASSWORD\",\nSubStatus =~ \"0xC000006D\", \"STATUS_LOGON_FAILURE\",\nSubStatus =~ \"0xC000006E\", \"STATUS_ACCOUNT_RESTRICTION\",\nSubStatus =~ \"0xC000006F\", \"STATUS_INVALID_LOGON_HOURS\",\nSubStatus =~ \"0xC0000070\", \"STATUS_INVALID_WORKSTATION\",\nSubStatus =~ \"0xC0000071\", \"STATUS_PASSWORD_EXPIRED\",\nSubStatus =~ \"0xC0000072\", \"STATUS_ACCOUNT_DISABLED\",\nSubStatus =~ \"0xC0000073\", \"STATUS_NONE_MAPPED\",\nSubStatus =~ \"0xC00000DC\", \"STATUS_INVALID_SERVER_STATE\",\nSubStatus =~ \"0xC0000133\", \"STATUS_TIME_DIFFERENCE_AT_DC\",\nSubStatus =~ \"0xC000018D\", \"STATUS_TRUSTED_RELATIONSHIP_FAILURE\",\nSubStatus =~ \"0xC0000193\", \"STATUS_ACCOUNT_EXPIRED\",\nSubStatus =~ \"0xC0000380\", \"STATUS_SMARTCARD_WRONG_PIN\",\nSubStatus =~ \"0xC0000381\", \"STATUS_SMARTCARD_CARD_BLOCKED\",\nSubStatus =~ \"0xC0000382\", \"STATUS_SMARTCARD_CARD_NOT_AUTHENTICATED\",\nSubStatus =~ \"0xC0000383\", \"STATUS_SMARTCARD_NO_CARD\",\nSubStatus =~ \"0xC0000384\", \"STATUS_SMARTCARD_NO_KEY_CONTAINER\",\nSubStatus =~ \"0xC0000385\", \"STATUS_SMARTCARD_NO_CERTIFICATE\",\nSubStatus =~ \"0xC0000386\", \"STATUS_SMARTCARD_NO_KEYSET\",\nSubStatus =~ \"0xC0000387\", \"STATUS_SMARTCARD_IO_ERROR\",\nSubStatus =~ \"0xC0000388\", \"STATUS_DOWNGRADE_DETECTED\",\nSubStatus =~ \"0xC0000389\", \"STATUS_SMARTCARD_CERT_REVOKED\",\n\"See - https://docs.microsoft.com/openspecs/windows_protocols/ms-erref/596a1078-e883-4972-9bbc-49e60bebca55\"\n)\n| project StartTimeUtc, EndTimeUtc, FailedVIPLogons, EventID, Activity, WorkstationName, Account, TargetAccount, TargetUserName, TargetDomainName, LogonType, LogonTypeName, LogonProcessName, Status, StatusDesc, SubStatus, SubStatusDesc\n| extend timestamp = StartTimeUtc, AccountCustomEntity = Account\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "VIP Account with more than 6 failed logon attempts in 10 minutes, include your own VIP list in the table below\n NTSTATUS codes - https://docs.microsoft.com/openspecs/windows_protocols/ms-erref/596a1078-e883-4972-9bbc-49e60bebca55"
+          },
+          {
+            "name": "tactics",
+            "value": "CredentialAccess"
+          }
+        ]
+      }
+    }
+  ]
+}

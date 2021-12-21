@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/QueryDataVolumeAnomolies')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Query data volume anomolies",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet delta = totimespan((endtime-starttime)*7);\nlet lookback = starttime - delta;\nlet threshold = 0;\nLAQueryLogs\n| where TimeGenerated between(starttime..endtime)\n| make-series rows = sum(ResponseRowCount) on TimeGenerated in range(lookback, endtime, 1h)\n| extend (anomalies, score, baseline) = series_decompose_anomalies(rows,3, -1, 'linefit')\n| mv-expand anomalies to typeof(int), score to typeof(double), TimeGenerated to typeof(datetime)\n| where anomalies > threshold\n| sort by score desc\n| join kind=rightsemi (\nLAQueryLogs\n| where TimeGenerated between(starttime..endtime)\n| summarize make_set(QueryText) by AADEmail, RequestTarget, TimeGenerated = bin(TimeGenerated, 1h))\non TimeGenerated\n| project TimeGenerated, AADEmail, RequestTarget, set_QueryText\n| extend timestamp = TimeGenerated, AccountCustomEntity = AADEmail\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This hunting query looks for anomalously large LA queries by users."
+          },
+          {
+            "name": "tactics",
+            "value": "Exfiltration"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1030"
+          }
+        ]
+      }
+    }
+  ]
+}

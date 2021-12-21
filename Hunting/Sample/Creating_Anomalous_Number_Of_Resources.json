@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/Creating_Anomalous_Number_Of_Resources')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Creation of an anomalous number of resources",
+        "category": "Hunting Queries",
+        "query": "\nAzureActivity\n| where OperationNameValue in~ (\"microsoft.compute/virtualMachines/write\", \"microsoft.resources/deployments/write\")\n| where ActivityStatusValue == \"Succeeded\" \n| make-series dcount(ResourceId)  default=0 on EventSubmissionTimestamp in range(ago(7d), now(), 1d) by Caller\n| extend AccountCustomEntity = Caller\n| extend timestamp = todatetime(EventSubmissionTimestamp[0])\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Looks for anomalous number of resources creation or deployment activities in azure activity log.\nIt is best to run this query on a look back period which is at least 7 days."
+          },
+          {
+            "name": "tactics",
+            "value": "Impact"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1496"
+          }
+        ]
+      }
+    }
+  ]
+}

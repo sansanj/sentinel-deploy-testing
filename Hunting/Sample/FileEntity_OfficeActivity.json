@@ -1,0 +1,34 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/FileEntity_OfficeActivity')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Preview - TI map File entity to OfficeActivity Event",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet ioc_lookBack = 14d;\nThreatIntelligenceIndicator\n| where TimeGenerated >= ago(ioc_lookBack) and ExpirationDateTime > now()\n| where Active == true\n| where isnotempty(FileName)\n|  join (\nOfficeActivity| where TimeGenerated between(starttime..endtime)\n      | where isnotempty(SourceFileName)\n      | extend OfficeActivity_TimeGenerated = TimeGenerated\n)\non $left.FileName == $right.SourceFileName\n| where OfficeActivity_TimeGenerated >= TimeGenerated and OfficeActivity_TimeGenerated < ExpirationDateTime\n| summarize LatestIndicatorTime = arg_max(TimeGenerated, *) by IndicatorId\n| project LatestIndicatorTime, Description, ActivityGroupNames, IndicatorId, ThreatType, Url, ExpirationDateTime, ConfidenceScore,\nOfficeActivity_TimeGenerated, FileName, UserId, ClientIP, OfficeObjectId\n| extend timestamp = OfficeActivity_TimeGenerated, AccountCustomEntity = UserId, IPCustomEntity = ClientIP, URLCustomEntity = Url\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Identifies a match in OfficeActivity Event data from any FileName IOC from TI.\nAs File name matches can create noise, this is best as hunting query"
+          },
+          {
+            "name": "tactics",
+            "value": "Impact"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/enumeration_user_and_group')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Enumeration of users and groups",
+        "category": "Hunting Queries",
+        "query": "\nlet ProcessCreationEvents=() {\nlet processEvents=SecurityEvent\n| where EventID==4688\n| project TimeGenerated, ComputerName=Computer,AccountName=SubjectUserName,        AccountDomain=SubjectDomainName,\nFileName=tostring(split(NewProcessName, '\\\\')[-1]),\nProcessCommandLine = CommandLine, \nFolderPath = \"\",\nInitiatingProcessFileName=ParentProcessName,InitiatingProcessCommandLine=\"\",InitiatingProcessParentFileName=\"\";\nprocessEvents};\nProcessCreationEvents\n| where FileName == 'net.exe' and AccountName != \"\" and ProcessCommandLine !contains '\\\\'  and ProcessCommandLine !contains '/add' \n| where (ProcessCommandLine contains ' user ' or ProcessCommandLine contains ' group ') and (ProcessCommandLine endswith ' /do' or ProcessCommandLine endswith ' /domain') \n| extend Target = extract(\"(?i)[user|group] (\\\"*[a-zA-Z0-9-_ ]+\\\"*)\", 1, ProcessCommandLine) | filter Target  != '' \n| summarize minTimeGenerated=min(TimeGenerated), maxTimeGenerated=max(TimeGenerated), count() by AccountName, Target, ProcessCommandLine, ComputerName\n| project minTimeGenerated, maxTimeGenerated, count_, AccountName, Target, ProcessCommandLine, ComputerName\n| sort by AccountName, Target\n| extend timestamp = minTimeGenerated, AccountCustomEntity = AccountName, HostCustomEntity = ComputerName\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Finds attempts to list users or groups using the built-in Windows 'net' tool "
+          },
+          {
+            "name": "tactics",
+            "value": "Discovery"
+          }
+        ]
+      }
+    }
+  ]
+}

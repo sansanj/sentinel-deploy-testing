@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/FailedUserLogons')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Summary of failed user logons by reason of failure",
+        "category": "Hunting Queries",
+        "query": "\nSecurityEvent\n| where AccountType == 'User' and EventID == 4625\n| extend Reason = case(\nSubStatus == '0xc000005e', 'No logon servers available to service the logon request',\nSubStatus == '0xc0000062', 'Account name is not properly formatted',\nSubStatus == '0xc0000064', 'Account name does not exist',\nSubStatus == '0xc000006a', 'Incorrect password',    SubStatus == '0xc000006d', 'Bad user name or password',\nSubStatus == '0xc000006f', 'User logon blocked by account restriction',\nSubStatus == '0xc000006f', 'User logon outside of restricted logon hours',\nSubStatus == '0xc0000070', 'User logon blocked by workstation restriction',\nSubStatus == '0xc0000071', 'Password has expired',\nSubStatus == '0xc0000072', 'Account is disabled',\nSubStatus == '0xc0000133', 'Clocks between DC and other computer too far out of sync',\nSubStatus == '0xc000015b', 'The user has not been granted the requested logon right at this machine',\nSubStatus == '0xc0000193', 'Account has expirated',\nSubStatus == '0xc0000224', 'User is required to change password at next logon',\nSubStatus == '0xc0000234', 'Account is currently locked out',\nstrcat('Unknown reason substatus: ', SubStatus))\n| summarize StartTimeUtc = min(TimeGenerated), EndTimeUtc = max(TimeGenerated), count() by Reason\n| extend timestamp = StartTimeUtc\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "A summary of failed logons can be used to infer lateral movement with the intention of discovering credentials and sensitive data"
+          },
+          {
+            "name": "tactics",
+            "value": "CredentialAccess,LateralMovement"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1110"
+          }
+        ]
+      }
+    }
+  ]
+}

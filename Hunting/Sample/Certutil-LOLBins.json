@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/Certutil-LOLBins')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Certutil (LOLBins and LOLScripts)",
+        "category": "Hunting Queries",
+        "query": "Event\n//This query uses sysmon data depending on table name used this may need updataing\n| where Source == \"Microsoft-Windows-Sysmon\"\n| where EventID == 1\n| extend RenderedDescription = tostring(split(RenderedDescription, \":\")[0])\n| extend EventData = parse_xml(EventData).DataItem.EventData.Data\n| mv-expand bagexpansion=array EventData\n| evaluate bag_unpack(EventData)\n| extend Key=tostring(['@Name']), Value=['#text']\n| evaluate pivot(Key, any(Value), TimeGenerated, Source, EventLog, Computer, EventLevel, EventLevelName, EventID, UserName, RenderedDescription, MG, ManagementGroupName, Type, _ResourceId)\n| extend RuleName = column_ifexists(\"RuleName\", \"\"), TechniqueId = column_ifexists(\"TechniqueId\", \"\"),  TechniqueName = column_ifexists(\"TechniqueName\", \"\")\n| parse RuleName with * 'technique_id=' TechniqueId ',' * 'technique_name=' TechniqueName\n| where Image has \"certutil.exe\"\n// Uncomment the next line and add your commandLine Whitelisted/ignore terms.For example \"urlcache\"\n// | where CommandLine !contains (\"urlcache\") \n| extend HostCustomEntity = Computer, AccountCustomEntity = UserName\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This detection uses Sysmon telemetry to hunt Certutil activities"
+          },
+          {
+            "name": "tactics",
+            "value": "CommandAndControl"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1105"
+          }
+        ]
+      }
+    }
+  ]
+}

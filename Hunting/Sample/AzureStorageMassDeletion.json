@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/AzureStorageMassDeletion')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Azure Storage Mass File Deletion",
+        "category": "Hunting Queries",
+        "query": "\nlet deleteThreshold = 3;\nlet deleteWindow = 10m;\nunion\nStorageFileLogs,\nStorageBlobLogs\n| where StatusText =~ \"Success\"\n| where OperationName =~ \"DeleteBlob\" or OperationName =~ \"DeleteFile\"\n| extend CallerIpAddress = tostring(split(CallerIpAddress, \":\", 0)[0])\n| summarize dcount(Uri) by bin(TimeGenerated, deleteWindow), CallerIpAddress, UserAgentHeader, AccountName\n| where dcount_Uri >= deleteThreshold\n| project TimeGenerated, IPCustomEntity=CallerIpAddress, UserAgentHeader, FilesDeleted=dcount_Uri, AccountName\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Detect mass file deletion events within Azure File and Blob storage. deleteWindow controls\nthe period of time the deletions must occur in, whilst the deleteThreshold controls how many files\nmust be deleted within that threshold. Query works"
+          },
+          {
+            "name": "tactics",
+            "value": "Impact"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1485"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/InactiveorNewAccountUsage')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "GitHub Inactive or New Account Access or Usage",
+        "category": "Hunting Queries",
+        "query": "\nlet starttime = todatetime('{{StartTimeISO}}');\nlet endtime = todatetime('{{EndTimeISO}}');\nlet LearningPeriod = 7d;\nlet EndLearningTime = starttime - LearningPeriod;\nlet GitHubActorLogin = (GitHubAudit\n| where Actor != \"\");\nlet GitHubUser = (GitHubAudit\n| where ImpactedUser != \"\");\nlet GitHubNewActorLogin = (GitHubActorLogin\n| where TimeGenerated between (EndLearningTime .. starttime)\n| summarize makeset(Actor)\n| extend Dummy = 1\n| join kind=innerunique (\n  GitHubActorLogin\n  | where TimeGenerated between (starttime .. endtime)\n  | distinct Actor\n  | extend Dummy = 1\n) on Dummy\n| project-away Dummy\n| where set_Actor  !contains Actor);\nlet GitHubNewUser = ( GitHubUser\n| where TimeGenerated between (EndLearningTime .. starttime)\n| summarize makeset(ImpactedUser)\n| extend Dummy = 1\n| join kind=innerunique (\n  GitHubUser\n  | where TimeGenerated between (startime .. endtime)\n  | distinct ImpactedUser\n  | extend Dummy = 1\n) on Dummy\n| project-away Dummy\n| where set_ImpactedUser !contains ImpactedUser);\nunion GitHubNewActorLogin, GitHubNewUser\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "This hunting query identifies Accounts that are new or inactive and have accessed or used GitHub that may be a sign of compromise."
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1136"
+          }
+        ]
+      }
+    }
+  ]
+}

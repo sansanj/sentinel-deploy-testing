@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/SuspectedLSASSDump')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Suspected LSASS Dump",
+        "category": "Hunting Queries",
+        "query": "SecurityEvent \n| where EventID == 4688\n| where CommandLine has_all (\"procdump\", \"lsass\") or CommandLine has_all (\"rundll32\", \"comsvcs\", \"MiniDump\")\n| extend timestamp = TimeGenerated, AccountCustomEntity = Account, HostCustomEntity = Computer\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Look for evidence of the LSASS process being dumped either using Procdump or comsvcs.dll. Often used by attackers to access credentials stored on a system.\nRef: https://risksense.com/blog/hidden-gems-in-windows-the-hunt-is-on/ & https://doc"
+          },
+          {
+            "name": "tactics",
+            "value": "CredentialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1003"
+          }
+        ]
+      }
+    }
+  ]
+}

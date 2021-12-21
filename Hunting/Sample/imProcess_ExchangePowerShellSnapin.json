@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/imProcess_ExchangePowerShellSnapin')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Exchange PowerShell Snapin Added (Normalized Process Events)",
+        "category": "Hunting Queries",
+        "query": "imProcessCreate\n | where Process has_any (\"cmd.exe\", \"powershell.exe\", \"PowerShell_ISE.exe\")\n | where CommandLine has \"Add-PSSnapin Microsoft.Exchange.Management.Powershell.Snapin\"\n | summarize FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated) by Dvc, User, CommandLine, EventVendor, EventProduct\n | extend timestamp = FirstSeen, AccountCustomEntity = User, HostCustomEntity = Dvc\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "The Exchange Powershell Snapin was loaded on a host, this allows for a Exchange server management via PowerShell.\nWhilst this is a legitimate administrative tool it is abused by attackers to performs actions on a compromised\nExchange server"
+          },
+          {
+            "name": "tactics",
+            "value": "Collection"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1119"
+          }
+        ]
+      }
+    }
+  ]
+}

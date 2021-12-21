@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/Signins-From-VPS-Providers')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "eTag": "*",
+        "displayName": "Signins From VPS Providers",
+        "category": "Hunting Queries",
+        "query": "\nlet IP_Data = (externaldata(network:string)\n[@\"https://raw.githubusercontent.com/Azure/Azure-Sentinel/master/Sample%20Data/Feeds/VPS_Networks.csv\"] with (format=\"csv\"));\nSigninLogs\n| where ResultType == 0\n| extend additionalDetails = tostring(Status.additionalDetails)\n| evaluate ipv4_lookup(IP_Data, IPAddress, network, return_unmatched = false)\n| summarize make_set(additionalDetails), StartTime = min(TimeGenerated), EndTime = max(TimeGenerated) by IPAddress, UserPrincipalName\n// Uncomment the remaining lines to only see logons from VPS providers with token only logons.\n//| where array_length(set_additionalDetails) == 2\n//| where (set_additionalDetails[1] == \"MFA requirement satisfied by claim in the token\" and set_additionalDetails[0] == \"MFA requirement satisfied by claim provided by external provider\") or (set_additionalDetails[0] == \"MFA requirement satisfied by claim in the token\" and set_additionalDetails[1] == \"MFA requirement satisfied by claim provided by external provider\")\n| extend timestamp = StartTime, AccountCustomEntity = UserPrincipalName, IPCustomEntity = IPAddress\n",
+        "version": 1,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Looks for successful logons from known VPS provider network ranges with suspicious token based logon patterns.\nThis is not an exhaustive list of VPS provider ranges but covers some of the most prevelent providers observed."
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess"
+          },
+          {
+            "name": "relevantTechniques",
+            "value": "T1078"
+          }
+        ]
+      }
+    }
+  ]
+}
