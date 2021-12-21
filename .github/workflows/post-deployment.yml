@@ -39,11 +39,12 @@ jobs:
           $resourceGroupName = $resourceGroupNameMatchInfo[0].Matches.Groups[1].Value
           $cloudEnvMatchInfo = Select-String -Path $workflowPath -Pattern "cloudEnv: '(.*)'"
           $cloudEnv = $cloudEnvMatchInfo[0].Matches.Groups[1].Value
+          Write-Host "cloudEnv: $cloudEnv"
           
-          echo "::set-output name=cloud_env::$cloudEnv"
           echo "::set-output name=source_control_id::$scId"
           echo "::set-output name=resource_group_name::$resourceGroupName"
           echo "::set-output name=workspace_name::$workspaceName"
+          echo "::set-output name=cloud_env::$cloudEnv"
 
 
     outputs:
