@@ -17,7 +17,7 @@
       "defaultValue": "96d70810-4165-44ec-8b29-deddb5f7e0bb",
       "minLength": 1,
       "metadata": {
-        "description": "Unique ID for the workbook"
+        "description": "Unique id for the workbook"
       }
     },
     "workbook-name": {
