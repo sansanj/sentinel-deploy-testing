@@ -8,8 +8,6 @@ $resourceGroupName = $Env:RESOURCE_GROUP_NAME
 $workspaceName = $Env:WORKSPACE_NAME
 $CloudEnv = $Env:CLOUD_ENV
 
-Write-Host "cloudEnv: $CloudEnv, workspaceName: $workspaceName, resourceGroupName: $resourceGroupName, tenantId: $tenantId, subscriptionId: $subscriptionId"
-
 function AttemptAzLogin($psCredential, $tenantId, $cloudEnv) {
     $maxLoginRetries = 3
     $delayInSeconds = 30
@@ -60,6 +58,7 @@ if ($CloudEnv -ne 'AzureCloud')
     ConnectAzCloud
 }
 
+# Dispose Connection
 $endpoint = $Creds.resourceManagerEndpointUrl
 $url = "${endpoint}subscriptions/$subscriptionId/resourceGroups/$resourceGroupName/providers/Microsoft.OperationalInsights/workspaces/$workspaceName/providers/Microsoft.SecurityInsights/sourceControls/${sourceControlId}?api-version=2021-03-01-preview"
 $token = "Bearer {0}" -f (Get-AzAccessToken -Resource "https://management.azure.com").Token
