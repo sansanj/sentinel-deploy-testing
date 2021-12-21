@@ -1,7 +1,7 @@
 Write-Output "Deleting Source Control"
 
 $sourceControlId = $Env:SOURCE_CONTROL_ID
-$Creds = $Env:CREDS | ConvertFrom-Json
+$Creds = $Env:CREDS
 $endpoint = "management.azure.com"
 $subscriptionId = $Creds.subscriptionId
 $tenantId = $Creds.tenantId
