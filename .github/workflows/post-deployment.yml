@@ -83,3 +83,11 @@ jobs:
          azPSVersion: 'latest'
          inlineScript: |
            ${{ github.workspace }}/.github/workflows/dispose.ps1
+
+     - name: Send Teams Message for success
+       uses: jdcargile/ms-teams-notification@v1.3
+       with:
+         github-token: ${{ github.token }}
+         ms-teams-webhook-uri: ${{ secrets.MS_TEAMS_WEBHOOK_URI }}
+         notification-summary: Workflow Run Failed On GitHub - ${{ github.event.workflow_run.html_url }}
+         notification-color: 28a745 
