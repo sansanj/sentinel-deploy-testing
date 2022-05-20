@@ -181,7 +181,7 @@ function main() {
     {
         $totalFiles = 0;
         $totalFailed = 0;
-        Get-ChildItem -Path $Directory -Recurse -Filter *.json |
+        Get-ChildItem -Path $Directory -Recurse -Filter *.json -exclude *metadata.json, *.parameters*.json |
         ForEach-Object {
             $path = $_.FullName
 	        try {
