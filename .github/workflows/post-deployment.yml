@@ -20,74 +20,14 @@ jobs:
           notification-summary: Workflow Run Failed On GitHub - ${{ github.event.workflow_run.html_url }}
           notification-color: dc3545 
   
-  on-success-prepare:
-    runs-on: windows-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v1
-
-      - name: Extract Variables
-        id: extract-variables
-        shell: pwsh
-        run: |
-          $workflowPath="${{github.event.workflow.path}}"
-          $scId=$workflowPath.Substring(34,36) -replace '-',''          
-          $workspaceNameMatchInfo = Select-String -Path $workflowPath -Pattern "workspaceName: '(.*)'"
-          $workspaceName = $workspaceNameMatchInfo[0].Matches.Groups[1].Value
-          $resourceGroupNameMatchInfo = Select-String -Path $workflowPath -Pattern "resourceGroupName: '(.*)'"
-          $resourceGroupName = $resourceGroupNameMatchInfo[0].Matches.Groups[1].Value
-          $cloudEnvMatchInfo = Select-String -Path $workflowPath -Pattern "cloudEnv: '(.*)'"
-          $cloudEnv = $cloudEnvMatchInfo[0].Matches.Groups[1].Value
-          $disposalSecretName = $cloudEnv -eq "AzurePPE"? "SOURCE_CONTROL_DISPOSAL_DF" : "SOURCE_CONTROL_DISPOSAL"
-          Write-Host $disposalSecretName
-          
-          echo "::set-output name=source_control_id::$scId"
-          echo "::set-output name=resource_group_name::$resourceGroupName"
-          echo "::set-output name=workspace_name::$workspaceName"
-          echo "::set-output name=cloud_env::$cloudEnv"
-          echo "::set-output name=disposal_secret_name::$disposalSecretName"
-
-    outputs:
-      source_control_id: ${{ steps.extract-variables.outputs.source_control_id }}
-      resource_group_name: ${{ steps.extract-variables.outputs.resource_group_name }}
-      workspace_name: ${{ steps.extract-variables.outputs.workspace_name }}
-      cloud_env: ${{ steps.extract-variables.outputs.cloud_env }}
-      disposal_secret_name: ${{ steps.extract-variables.outputs.disposal_secret_name }}
-      
   on-success:
-   needs: 
-     - on-success-prepare
    runs-on: windows-latest
-   env:
-     SOURCE_CONTROL_ID: ${{ needs.on-success-prepare.outputs.source_control_id }}
-     CREDS: ${{ secrets[needs.on-success-prepare.outputs.disposal_secret_name] }}
-     RESOURCE_GROUP_NAME: ${{ needs.on-success-prepare.outputs.resource_group_name }}
-     WORKSPACE_NAME: ${{ needs.on-success-prepare.outputs.workspace_name }}
-     CLOUD_ENV: ${{ needs.on-success-prepare.outputs.cloud_env }}     
+   if: ${{ github.event.workflow_run.conclusion == 'success' }}
    steps:
-     - name: Login to Azure
-       id: login
-       uses: azure/login@v1
-       if: ${{ env.CLOUD_ENV == 'AzureCloud' }}
-       with:
-         creds: ${{ secrets.SOURCE_CONTROL_DISPOSAL }}
-         enable-AzPSSession: true
-     
-     - name: Checkout
-       uses: actions/checkout@v1
-
-     - name: Dispose connection
-       uses: azure/powershell@v1
-       with:
-         azPSVersion: 'latest'
-         inlineScript: |
-           ${{ github.workspace }}/.github/workflows/dispose.ps1
-
      - name: Send Teams Message for success
        uses: jdcargile/ms-teams-notification@v1.3
        with:
          github-token: ${{ github.token }}
          ms-teams-webhook-uri: ${{ secrets.MS_TEAMS_WEBHOOK_URI }}
-         notification-summary: Workflow Run Failed On GitHub - ${{ github.event.workflow_run.html_url }}
+         notification-summary: Workflow Run Succeeded On GitHub - ${{ github.event.workflow_run.html_url }}
          notification-color: 28a745 
