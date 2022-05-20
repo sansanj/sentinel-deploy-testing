@@ -11,7 +11,7 @@
         "sourceControlId": {
             "type": "string"
         },
-        "workspace": {
+        "workspace": { 
             "type": "string"
         }
     },
