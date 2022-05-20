@@ -15,7 +15,7 @@ jobs:
       - name: Send Teams Message if failed
         uses: jdcargile/ms-teams-notification@v1.3
         with:
-          github-token: ${{ github.token }}
+          github-token: ${{ github.token }} 
           ms-teams-webhook-uri: ${{ secrets.MS_TEAMS_WEBHOOK_URI }}
           notification-summary: Workflow Run Failed On GitHub - ${{ github.event.workflow_run.html_url }}
           notification-color: dc3545 
