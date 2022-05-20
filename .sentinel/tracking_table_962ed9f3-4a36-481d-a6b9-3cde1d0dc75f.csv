@@ -1,5 +1,0 @@
-FileName, CommitSha
-Detections\Sample\MalformedUserAgents.json,ee6bc4e38e526f390b1936c568cf54dba43c2e9f
-Detections\Sample\imProcess_NOBELIUM_SuspiciousRundll32Exec.json,0ac47f62be8d0fe9152367ac42415cb52bd14ae4
-Detections\Sample\PasswordSpray.json,9190e34e9b54db53303efe49488cf5cf8c245b1c
-Detections\Sample\PaloAlto-PortScanning.json,2c192f812fefe77f21c705f233952461c0b149d7
