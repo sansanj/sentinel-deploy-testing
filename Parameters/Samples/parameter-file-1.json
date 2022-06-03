@@ -3,7 +3,7 @@
     "contentVersion": "1.0.0.0",
     "parameters": {
         "PlaybookName": {
-            "value": "PaloAlto-PAN-OS-BlockIP (via mapped parameter file)"
+            "value": "PaloAlto-PAN-OS-BlockIP-via-mapped-parameter-file"
         },
         "Address Group": {
             "Value": "SpecifyANewAddressGroup"
