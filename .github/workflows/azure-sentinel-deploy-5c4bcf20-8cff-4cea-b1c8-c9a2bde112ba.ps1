@@ -497,7 +497,7 @@ function Deployment($fullDeploymentFlag, $remoteShaTable, $tree) {
                 Write-Host "[Warning] Skipping deployment for $path. The file contains resources for content that was not selected for deployment. Please add content type to connection if you want this file to be deployed."
                 return
             }       
-            #parameterFile = GetParameterFile $path
+            $parameterFile = GetParameterFile $path
             $result = SmartDeployment $fullDeploymentFlag $remoteShaTable $path $parameterFile $templateObject
             if ($result.isSuccess -eq $false) {
                 $totalFailed++
