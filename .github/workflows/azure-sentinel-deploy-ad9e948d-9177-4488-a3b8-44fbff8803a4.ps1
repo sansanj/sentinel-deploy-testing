@@ -497,7 +497,7 @@ function Deployment($fullDeploymentFlag, $remoteShaTable, $tree) {
                 Write-Host "[Warning] Skipping deployment for $path. The file contains resources for content that was not selected for deployment. Please add content type to connection if you want this file to be deployed."
                 return
             }       
-            #parameterFile = GetParameterFile $path
+            $parameterFile = GetParameterFile $path
             $result = SmartDeployment $fullDeploymentFlag $remoteShaTable $path $parameterFile $templateObject
             if ($result.isSuccess -eq $false) {
                 $totalFailed++
@@ -574,7 +574,7 @@ function main() {
 
     $existingConfigSha = $global:localCsvTablefinal[$configPath]
     $remoteConfigSha = $remoteShaTable[$configPath]
-    $modifiedConfig = ((!$existingConfigSha) -or ($existingConfigSha -ne $remoteConfigSha))
+    $modifiedConfig = ($existingConfigSha -xor $remoteConfigSha) -or ($existingConfigSha -and $remoteConfigSha -and ($existingConfigSha -ne $remoteConfigSha))
     $global:updatedCsvTable[$configPath] = $remoteConfigSha
 
     $fullDeploymentFlag = $modifiedConfig -or (-not (Test-Path $csvPath)) -or ($smartDeployment -eq "false")
