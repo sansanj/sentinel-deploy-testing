@@ -24,7 +24,7 @@ jobs:
       resourceGroupName: 'parameter-file-test-rg'
       workspaceName: 'parameter-file-test-workspace'
       workspaceId: '879001c8-2181-4374-be7d-72e5dc69bd2b'
-      directory: '${{ github.workspace }}'
+      directory: '${{ github.workspace }}/Detections/Sample'
       cloudEnv: 'AzureCloud'
       creds: ${{ secrets.AZURE_SENTINEL_CREDENTIALS_46e3115a0fd8422c92f6e6536ac505bc }}
       contentTypes: 'AnalyticsRule,HuntingQuery,AutomationRule,Playbook,Workbook'
