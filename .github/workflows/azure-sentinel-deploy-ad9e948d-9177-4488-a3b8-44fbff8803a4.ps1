@@ -15,12 +15,13 @@ $contentTypeMapping = @{
     "Workbook"=@("Microsoft.Insights/workbooks");
 }
 $sourceControlId = $Env:sourceControlId 
+$rootDirectory = $Env:rootDirectory
 $githubAuthToken = $Env:githubAuthToken
 $githubRepository = $Env:GITHUB_REPOSITORY
 $branchName = $Env:branch
 $smartDeployment = $Env:smartDeployment
-$csvPath = ".sentinel\tracking_table_$sourceControlId.csv"
-$configPath = "sentinel-deployment.config"
+$csvPath = "$rootDirectory\.sentinel\tracking_table_$sourceControlId.csv"
+$configPath = "$rootDirectory\sentinel-deployment.config"
 $global:localCsvTablefinal = @{}
 $global:updatedCsvTable = @{}
 $global:parameterFileMapping = @{}
@@ -94,7 +95,8 @@ $secondsBetweenAttempts = 5
 function ConvertTableToString {
     $output = "FileName, CommitSha`n"
     $global:updatedCsvTable.GetEnumerator() | ForEach-Object {
-        $output += "{0},{1}`n" -f $_.Key, $_.Value
+        $key = RelativePathWithBackslash $_.Key
+        $output += "{0},{1}`n" -f $key, $_.Value
     }
     return $output
 }
@@ -113,7 +115,8 @@ function GetGithubTree {
 
 #Gets blob commit sha of the csv file, used when updating csv file to repo 
 function GetCsvCommitSha($getTreeResponse) {
-    $shaObject = $getTreeResponse.tree | Where-Object { $_.path -eq $csvPath.Replace("\", "/") }
+    $relativeCsvPath = RelativePathWithBackslash $csvPath
+    $shaObject = $getTreeResponse.tree | Where-Object { $_.path -eq $relativeCsvPath }
     return $shaObject.sha
 }
 
@@ -121,9 +124,9 @@ function GetCsvCommitSha($getTreeResponse) {
 function GetCommitShaTable($getTreeResponse) {
     $shaTable = @{}
     $getTreeResponse.tree | ForEach-Object {
-        if (([System.IO.Path]::GetExtension($_.path) -eq ".json") -or ($_.path -eq $configPath))
+        $truePath = AbsolutePathWithSlash $_.path
+        if (([System.IO.Path]::GetExtension($_.path) -eq ".json") -or ($truePath -eq $configPath))
         {
-            $truePath =  $_.path.Replace("/", "\")
             $shaTable.Add($truePath, $_.sha)
         }
     }
@@ -132,9 +135,9 @@ function GetCommitShaTable($getTreeResponse) {
 
 #Pushes new/updated csv file to the user's repository. If updating file, will need csv commit sha. 
 function PushCsvToRepo($getTreeResponse) {
-    $path = $csvPath.Replace("\", "/")
+    $relativeCsvPath = RelativePathWithBackslash $csvPath
     $sha = GetCsvCommitSha $getTreeResponse
-    $createFileUrl = "https://api.github.com/repos/$githubRepository/contents/$path"
+    $createFileUrl = "https://api.github.com/repos/$githubRepository/contents/$relativeCsvPath"
     $content = ConvertTableToString
     $encodedContent = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($content))
     
@@ -159,18 +162,10 @@ function ReadCsvToTable {
     $HashTable=@{}
     foreach($r in $csvTable)
     {
-        $HashTable[$r.FileName]=$r.CommitSha
+        $key = AbsolutePathWithSlash $r.FileName 
+        $HashTable[$key]=$r.CommitSha
     }   
     return $HashTable    
-}
-
-#Checks and removes any deleted content files
-function CleanDeletedFilesFromTable {
-    $global:updatedCsvTable.Clone().GetEnumerator() | ForEach-Object {
-        if (!(Test-Path -Path $_.Key)) {
-            $global:updatedCsvTable.Remove($_.Key)
-        }
-    }
 }
 
 function AttemptInvokeRestMethod($method, $url, $body, $contentTypes, $maxRetries) {
@@ -431,7 +426,7 @@ function LoadDeploymentConfig() {
             if ($deployment_config.excludecontentfiles) {
                 $excludeList = $excludeList + $deployment_config.excludecontentfiles
             }
-            $global:excludeContentFiles = $excludeList | Where-Object { Test-Path $_ }
+            $global:excludeContentFiles = $excludeList | Where-Object { Test-Path (AbsolutePathWithSlash $_) }
         }
     }
     catch {
@@ -441,17 +436,25 @@ function LoadDeploymentConfig() {
     }
 }
 
-function filterContentFile($path) {
-	$temp = $path.Replace($Directory + "\", "").Replace("\", "/")
+function filterContentFile($fullPath) {
+	$temp = RelativePathWithBackslash $fullPath
 	return $global:excludeContentFiles | ? {$temp.StartsWith($_, 'CurrentCultureIgnoreCase')}
+}
+
+function RelativePathWithBackslash($absolutePath) {
+	return $absolutePath.Replace($rootDirectory + "\", "").Replace("\", "/")
+}
+
+function AbsolutePathWithSlash($relativePath) {
+	return Join-Path -Path $rootDirectory -ChildPath $relativePath
 }
 
 #resolve parameter file name, return $null if there is none.
 function GetParameterFile($path) {
-    $index = $path.Replace("\", "/")
+    $index = RelativePathWithBackslash $path
     $key = ($global:parameterFileMapping.Keys | ? { $_ -eq $index })
     if ($key) {
-        $mappedParameterFile = $global:parameterFileMapping[$key].Replace("/", "\")
+        $mappedParameterFile = AbsolutePathWithSlash $global:parameterFileMapping[$key]
         if (Test-Path $mappedParameterFile) {
             return $mappedParameterFile
         }
@@ -478,12 +481,12 @@ function Deployment($fullDeploymentFlag, $remoteShaTable, $tree) {
     {
         $totalFiles = 0;
         $totalFailed = 0;
-	    $iterationList = @()
-        $global:prioritizedContentFiles | ForEach-Object  { $iterationList += $_.Replace("/", "\") }
+	      $iterationList = @()
+        $global:prioritizedContentFiles | ForEach-Object  { $iterationList += (AbsolutePathWithSlash $_) }
         Get-ChildItem -Path $Directory -Recurse -Filter *.json -exclude *metadata.json, *.parameters*.json |
                         Where-Object { $null -eq ( filterContentFile $_.FullName ) } |
                         Select-Object -Property FullName |
-                        ForEach-Object { $iterationList += $_.FullName.Replace($Directory + "\", "") }
+                        ForEach-Object { $iterationList += $_.FullName }
         $iterationList | ForEach-Object {
             $path = $_
             Write-Host "[Info] Try to deploy $path"
@@ -505,14 +508,13 @@ function Deployment($fullDeploymentFlag, $remoteShaTable, $tree) {
             if (-not $result.skip) {
                 $totalFiles++
             }
-            if ($result.isSuccess) {
+            if ($result.isSuccess -or $result.skip) {
                 $global:updatedCsvTable[$path] = $remoteShaTable[$path]
                 if ($parameterFile) {
                     $global:updatedCsvTable[$parameterFile] = $remoteShaTable[$parameterFile]
                 }
             }
         }
-        CleanDeletedFilesFromTable
         PushCsvToRepo $tree
         if ($totalFiles -gt 0 -and $totalFailed -gt 0) 
         {
@@ -564,7 +566,6 @@ function main() {
 
     if (Test-Path $csvPath) {
         $global:localCsvTablefinal = ReadCsvToTable
-        $global:updatedCsvTable = $global:localCsvTablefinal.Clone()
     }
 
     LoadDeploymentConfig
@@ -575,7 +576,9 @@ function main() {
     $existingConfigSha = $global:localCsvTablefinal[$configPath]
     $remoteConfigSha = $remoteShaTable[$configPath]
     $modifiedConfig = ($existingConfigSha -xor $remoteConfigSha) -or ($existingConfigSha -and $remoteConfigSha -and ($existingConfigSha -ne $remoteConfigSha))
-    $global:updatedCsvTable[$configPath] = $remoteConfigSha
+    if ($remoteConfigSha) {
+        $global:updatedCsvTable[$configPath] = $remoteConfigSha
+    }
 
     $fullDeploymentFlag = $modifiedConfig -or (-not (Test-Path $csvPath)) -or ($smartDeployment -eq "false")
     Deployment $fullDeploymentFlag $remoteShaTable $tree
